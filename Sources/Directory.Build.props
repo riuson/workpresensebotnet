@@ -1,0 +1,49 @@
+<Project>
+    <!--// Solution //-->
+
+    <PropertyGroup>
+        <Company>riuson.com</Company>
+        <Product>WorkspacePresenceBot</Product>
+        <Copyright>© 2022 riuson@gmail.com</Copyright>
+	    <TargetFramework>net6.0</TargetFramework>
+        <Deterministic>true</Deterministic>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <LangVersion>10.0</LangVersion>
+	    <ImplicitUsings>enable</ImplicitUsings>
+	    <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="$(AssemblyName.Contains('Tests'))">
+        <IsPackable>false</IsPackable>
+        <IsPublishable>false</IsPublishable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- Output paths -->
+        <!--<OutputPath>$(SolutionDir)_Artifacts\$(TargetFramework)\bin\$(Configuration)\</OutputPath>
+        <OutDir>$(OutputPath)</OutDir>-->
+        <!--<BaseIntermediateOutputPath>$(SolutionDir)_Artifacts\\$(TargetFramework)obj\$(Configuration)\$(MSBuildProjectName)\</BaseIntermediateOutputPath>-->
+        <!--<IntermediateOutputPath>$(SolutionDir)_Artifacts\$(TargetFramework)\obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>
+        <MSBuildProjectExtensionsPath>$(SolutionDir)_Artifacts\ext\$(Configuration)\$(MSBuildProjectName)\</MSBuildProjectExtensionsPath>
+        <ProjectAssetsFile>$(SolutionDir)_Artifacts\ext\$(Configuration)\$(MSBuildProjectName)\project.assets.json</ProjectAssetsFile>
+        <DocumentationFile>$(SolutionDir)_Artifacts\$(TargetFramework)\bin\doc\$(Configuration)\$(MSBuildProjectName).xml</DocumentationFile>
+        <GitVersionFilePath>$(SolutionDir)_Artifacts\$(TargetFramework)\obj\$(Configuration)\GitVersion.props</GitVersionFilePath>-->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+        <DebugType>full</DebugType>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <DebugType>none</DebugType>
+    </PropertyGroup>
+
+    <ItemGroup>
+	    <PackageReference Include="Autofac" Version="6.3.0" />
+        <PackageReference Include="GitVersion.MsBuild" Version="5.9.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+</Project>

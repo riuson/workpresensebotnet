@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ServerApp</name>
+    </assembly>
+    <members>
+        <member name="T:MyApp.Program">
+            <summary>
+            Program entry class.
+            </summary>
+        </member>
+        <member name="M:MyApp.Program.Main(System.String[])">
+            <summary>
+            Main entry point.
+            </summary>
+            <param name="args">Command line arguments.</param>
+        </member>
+    </members>
+</doc>
