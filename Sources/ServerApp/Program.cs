@@ -29,12 +29,6 @@ internal class Program
             .ConfigureServices((hostingContext, services) => { services.AddHostedService<TeleBotService>(); })
             .Build();
 
-        var config = host.Services.GetRequiredService<IConfiguration>();
-
-        var telegramBotToken = config.GetValue<string>("TelegramBotToken");
-        var webHookPort = config.GetValue<int>("WebHook:Port");
-        var webHookUri = config.GetValue<string>("WebHook:uri");
-
         await host.RunAsync();
     }
 }

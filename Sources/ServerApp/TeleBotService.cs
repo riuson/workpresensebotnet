@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace ServerApp;
@@ -9,22 +10,28 @@ namespace ServerApp;
 public class TeleBotService : IHostedService
 {
     private readonly ILogger logger;
+    private readonly IConfiguration config;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TeleBotService"/> class.
     /// </summary>
     /// <param name="logger">Logger service.</param>
     /// <param name="appLifetime">Application's lifetime events.</param>
+    /// <param name="config">Configuration.</param>
     public TeleBotService(
         ILogger<TeleBotService> logger,
-        IHostApplicationLifetime appLifetime)
+        IHostApplicationLifetime appLifetime,
+        IConfiguration config)
     {
         this.logger = logger;
+        this.config = config;
 
         appLifetime.ApplicationStarted.Register(this.OnStarted);
         appLifetime.ApplicationStopping.Register(this.OnStopping);
         appLifetime.ApplicationStopped.Register(this.OnStopped);
     }
+
+    private string Token => this.config.GetValue<string>("TelegramBotToken");
 
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
