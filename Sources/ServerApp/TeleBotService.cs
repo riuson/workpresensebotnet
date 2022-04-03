@@ -87,7 +87,7 @@ public class TeleBotService : BackgroundService
         {
             var receiverOptions = new ReceiverOptions()
             {
-                AllowedUpdates = { },
+                AllowedUpdates = new UpdateType[] { UpdateType.Message },
             };
 
             this.client.StartReceiving(
@@ -103,28 +103,19 @@ public class TeleBotService : BackgroundService
         Update update,
         CancellationToken cancellationToken)
     {
-        // Only process Message updates: https://core.telegram.org/bots/api#message
-        if (update.Type != UpdateType.Message)
+        switch (update.Type)
         {
-            return;
+            case UpdateType.Message when update.Message!.Type == MessageType.Text:
+            {
+                await this.ProcessTextMessage(botClient, update.Message, cancellationToken);
+                break;
+            }
+
+            default:
+            {
+                break;
+            }
         }
-
-        // Only process text messages
-        if (update.Message!.Type != MessageType.Text)
-        {
-            return;
-        }
-
-        var chatId = update.Message.Chat.Id;
-        var messageText = update.Message.Text;
-
-        this.logger.LogInformation($"Received a '{messageText}' message in chat {chatId}.");
-
-        // Echo received message text
-        Message sentMessage = await botClient.SendTextMessageAsync(
-            chatId: chatId,
-            text: "You said:\n" + messageText,
-            cancellationToken: cancellationToken);
     }
 
     private Task HandleErrorAsync(
@@ -141,5 +132,22 @@ public class TeleBotService : BackgroundService
 
         this.logger.LogCritical(exception, errorMessage);
         return Task.CompletedTask;
+    }
+
+    private async Task ProcessTextMessage(
+        ITelegramBotClient botClient,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        var chatId = message.Chat.Id;
+        var messageText = message.Text;
+
+        this.logger.LogInformation($"Received a '{messageText}' message in chat {chatId}.");
+
+        // Echo received message text
+        Message sentMessage = await botClient.SendTextMessageAsync(
+            chatId: chatId,
+            text: "You said:\n" + messageText,
+            cancellationToken: cancellationToken);
     }
 }
