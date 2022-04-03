@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ServerApp.ChatBot;
+using ServerApp.DB;
 
 namespace ServerApp;
 
@@ -31,6 +32,7 @@ internal class Program
             {
                 services.AddHostedService<TeleBotService>();
                 services.AddTransient<IMessageHandler, MessageHandler>();
+                services.AddSingleton<IDatabase, Database>();
             })
             .Build();
 
