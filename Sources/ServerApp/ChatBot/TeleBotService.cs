@@ -7,7 +7,7 @@ using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-namespace ServerApp;
+namespace ServerApp.ChatBot;
 
 /// <summary>
 /// Master class of telegram bot.

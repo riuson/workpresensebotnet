@@ -1,7 +1,7 @@
 ﻿using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace ServerApp
+namespace ServerApp.ChatBot
 {
     /// <summary>
     /// Interface for message handlers.

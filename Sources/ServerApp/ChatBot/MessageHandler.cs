@@ -2,7 +2,7 @@
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace ServerApp;
+namespace ServerApp.ChatBot;
 
 /// <summary>
 /// Implementation of message handler.
@@ -22,7 +22,9 @@ public class MessageHandler : IMessageHandler
     }
 
     /// <inheritdoc />
-    public async Task ProcessTextMessage(ITelegramBotClient botClient, Message message,
+    public async Task ProcessTextMessage(
+        ITelegramBotClient botClient,
+        Message message,
         CancellationToken cancellationToken)
     {
         var chatId = message.Chat.Id;
