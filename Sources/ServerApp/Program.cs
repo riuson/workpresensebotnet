@@ -26,7 +26,11 @@ internal class Program
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true);
             })
-            .ConfigureServices((hostingContext, services) => { services.AddHostedService<TeleBotService>(); })
+            .ConfigureServices((hostingContext, services) =>
+            {
+                services.AddHostedService<TeleBotService>();
+                services.AddTransient<IMessageHandler, MessageHandler>();
+            })
             .Build();
 
         await host.RunAsync();

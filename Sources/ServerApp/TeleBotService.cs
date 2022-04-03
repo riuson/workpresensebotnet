@@ -16,6 +16,7 @@ public class TeleBotService : BackgroundService
 {
     private readonly ILogger logger;
     private readonly IHostApplicationLifetime appLifetime;
+    private readonly IMessageHandler messageHandler;
     private readonly TelegramBotClient client;
 
     /// <summary>
@@ -24,13 +25,16 @@ public class TeleBotService : BackgroundService
     /// <param name="logger">Logger service.</param>
     /// <param name="appLifetime">Application's lifetime events.</param>
     /// <param name="config">Configuration.</param>
+    /// <param name="messageHandler">Message handler service.</param>
     public TeleBotService(
         ILogger<TeleBotService> logger,
         IHostApplicationLifetime appLifetime,
-        IConfiguration config)
+        IConfiguration config,
+        IMessageHandler messageHandler)
     {
         this.logger = logger;
         this.appLifetime = appLifetime;
+        this.messageHandler = messageHandler;
 
         var token = config.GetValue<string>("TelegramBotToken");
         this.client = new TelegramBotClient(token);
@@ -107,7 +111,7 @@ public class TeleBotService : BackgroundService
         {
             case UpdateType.Message when update.Message!.Type == MessageType.Text:
             {
-                await this.ProcessTextMessage(botClient, update.Message, cancellationToken);
+                await this.messageHandler.ProcessTextMessage(botClient, update.Message, cancellationToken);
                 break;
             }
 
@@ -132,22 +136,5 @@ public class TeleBotService : BackgroundService
 
         this.logger.LogCritical(exception, errorMessage);
         return Task.CompletedTask;
-    }
-
-    private async Task ProcessTextMessage(
-        ITelegramBotClient botClient,
-        Message message,
-        CancellationToken cancellationToken)
-    {
-        var chatId = message.Chat.Id;
-        var messageText = message.Text;
-
-        this.logger.LogInformation($"Received a '{messageText}' message in chat {chatId}.");
-
-        // Echo received message text
-        Message sentMessage = await botClient.SendTextMessageAsync(
-            chatId: chatId,
-            text: "You said:\n" + messageText,
-            cancellationToken: cancellationToken);
     }
 }
