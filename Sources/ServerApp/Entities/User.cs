@@ -36,6 +36,11 @@
         public Status Status { get; set; } = Status.Unknown;
 
         /// <summary>
+        /// Gets or sets time when <see cref="Status"/> was changed.
+        /// </summary>
+        public DateTime StatusTime { get; set; } = DateTime.MinValue;
+
+        /// <summary>
         /// Gets or sets a web hook id.
         /// </summary>
         public Guid WebHookId { get; set; } = Guid.NewGuid();
