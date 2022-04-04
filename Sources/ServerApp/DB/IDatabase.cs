@@ -36,7 +36,7 @@ public interface IDatabase
     /// <param name="state">The new State of User.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task UpdateUserState(
+    Task UpdateUserStateAsync(
         Guid webHookId,
         UserState state,
         CancellationToken cancellationToken);
