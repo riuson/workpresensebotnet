@@ -86,7 +86,7 @@ public class Database : IDatabase
     }
 
     /// <inheritdoc />
-    public async Task UpdateUserState(
+    public async Task UpdateUserStateAsync(
         long userId,
         UserState state,
         CancellationToken cancellationToken)
@@ -113,7 +113,68 @@ public class Database : IDatabase
         }
         catch (Exception exc)
         {
-            this.logger.LogCritical(exc, "An error was occur while loading users list!");
+            this.logger.LogCritical(exc, "An error was occur while updating status of user!");
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateUserStateAsync(
+        Guid webHookId,
+        UserState state,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection($"Filename={this.DatabasePath}");
+
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command =
+                new SqliteCommand(
+                    "update users set (state, state_timestamp) = (@state, @timestamp) where web_hook_id = @web_hook_id;",
+                    connection);
+            command.Parameters.Add("@state", SqliteType.Integer).Value = (int)state;
+            command.Parameters.Add("@timestamp", SqliteType.Text).Value =
+                DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+            command.Parameters.Add("@web_hook_id", SqliteType.Integer).Value = webHookId.ToString();
+            var affectedRows = await command.ExecuteNonQueryAsync(cancellationToken);
+
+            switch (affectedRows)
+            {
+                case > 1:
+                {
+                    throw new Exception(
+                        $"More than 1 rows are affected by web_hook_id {webHookId}!");
+                }
+
+                case 1:
+                {
+                    this.logger.LogInformation(
+                        $"Successfully changed state of user by web_hook_id {webHookId} to {state}.");
+                    break;
+                }
+
+                case 0:
+                {
+                    this.logger.LogWarning(
+                        $"Received web_hook_id {webHookId} was not found!");
+                    break;
+                }
+
+                default:
+                {
+                    throw new Exception(
+                        $"Invalid number of rows ({affectedRows}) was affected by web_hook_id {webHookId}!");
+                }
+            }
+        }
+        catch (Exception exc)
+        {
+            this.logger.LogCritical(exc, "An error was occur while updating status of user!");
         }
         finally
         {

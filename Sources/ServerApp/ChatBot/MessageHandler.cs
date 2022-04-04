@@ -78,7 +78,7 @@ public class MessageHandler : IMessageHandler
                     "/stay" => UserState.StayAtHome,
                     _ => UserState.Unknown,
                 };
-                await this.database.UpdateUserState(
+                await this.database.UpdateUserStateAsync(
                     userId,
                     state,
                     cancellationToken);
