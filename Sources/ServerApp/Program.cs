@@ -1,8 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ServerApp.ChatBot;
-using ServerApp.DB;
+using ServerApp.Database;
 
 namespace ServerApp;
 
@@ -30,9 +31,13 @@ internal class Program
             })
             .ConfigureServices((hostingContext, services) =>
             {
+                var configuration = hostingContext.Configuration;
                 services.AddHostedService<TeleBotService>();
                 services.AddTransient<IMessageHandler, MessageHandler>();
-                services.AddSingleton<IDatabase, Database>();
+                ////services.AddDbContextFactory<ApplicationDbContext>(optionsBuilder => optionsBuilder.UseSqlite(configuration.GetConnectionString("DatFile2")));
+                ////services.AddDbContext<ApplicationDbContext>();
+                services.AddDbContext<ApplicationDbContext>(options =>
+                    options.UseSqlite(configuration.GetConnectionString("DatFile2")));
             })
             .Build();
 
