@@ -36,6 +36,7 @@ internal class Program
                 services.AddTransient<IMessageHandler, MessageHandler>();
                 services.AddDbContext<ApplicationDbContext>(options =>
                     options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+                services.AddTransient<IDatabase, Database.Database>();
             })
             .Build();
 

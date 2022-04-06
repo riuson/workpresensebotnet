@@ -82,32 +82,29 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                using (var scope = this.serviceProvider.CreateScope())
+                using (var db = this.serviceProvider.GetService<IDatabase>())
                 {
-                    using (var dbContext = scope.ServiceProvider.GetService<ApplicationDbContext>())
+                    var user = await db!.Context!.Users!.FirstOrDefaultAsync(
+                        x => x.UserId == userId,
+                        cancellationToken);
+
+                    if (user is null)
                     {
-                        var user = await dbContext!.Users!.FirstOrDefaultAsync(
-                            x => x.UserId == userId,
-                            cancellationToken);
-
-                        if (user is null)
+                        user = new User()
                         {
-                            user = new User()
-                            {
-                                UserId = userId,
-                                FirstName = receivedMessage.From?.FirstName ?? string.Empty,
-                                LastName = receivedMessage.From?.LastName ?? string.Empty,
-                                NickName = receivedMessage.From?.Username ?? string.Empty,
-                                WebHookId = Guid.NewGuid(),
-                            };
-                            dbContext!.Users!.Add(user!);
-                        }
-
-                        user.Status = status;
-                        user.StatusTime = DateTime.Now;
-
-                        await dbContext.SaveChangesAsync(cancellationToken);
+                            UserId = userId,
+                            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
+                            LastName = receivedMessage.From?.LastName ?? string.Empty,
+                            NickName = receivedMessage.From?.Username ?? string.Empty,
+                            WebHookId = Guid.NewGuid(),
+                        };
+                        db!.Context!.Users!.Add(user!);
                     }
+
+                    user.Status = status;
+                    user.StatusTime = DateTime.Now;
+
+                    await db!.Context.SaveChangesAsync(cancellationToken);
                 }
 
                 await this.SendMessageAsync(
