@@ -1,10 +1,13 @@
 ﻿using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ServerApp.DB;
-using ServerApp.Defs;
+using ServerApp.Database;
+using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using User = ServerApp.Entities.User;
 
 namespace ServerApp.ChatBot;
 
@@ -13,21 +16,21 @@ namespace ServerApp.ChatBot;
 /// </summary>
 public class MessageHandler : IMessageHandler
 {
+    private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandler> logger;
-    private readonly IDatabase database;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageHandler"/> class.
     /// </summary>
+    /// <param name="serviceProvider">Service provider.</param>
     /// <param name="logger">Logger service.</param>
-    /// <param name="database">Database.</param>
     public MessageHandler(
-        ILogger<MessageHandler> logger,
-        IDatabase database)
+        IServiceProvider serviceProvider,
+        ILogger<MessageHandler> logger)
     {
+        this.serviceProvider = serviceProvider;
         this.logger = logger;
-        this.database = database;
     }
 
     /// <inheritdoc />
@@ -71,21 +74,43 @@ public class MessageHandler : IMessageHandler
             case "/left":
             case "/stay":
             {
-                var state = commandText switch
+                var status = commandText switch
                 {
-                    "/came" => UserState.CameToWork,
-                    "/left" => UserState.LeftWork,
-                    "/stay" => UserState.StayAtHome,
-                    _ => UserState.Unknown,
+                    "/came" => Status.CameToWork,
+                    "/left" => Status.LeftWork,
+                    "/stay" => Status.StayAtHome,
+                    _ => Status.Unknown,
                 };
-                await this.database.UpdateUserStateAsync(
-                    userId,
-                    state,
-                    cancellationToken);
+
+                using (var db = this.serviceProvider.GetService<IDatabase>())
+                {
+                    var user = await db!.Context!.Users!.FirstOrDefaultAsync(
+                        x => x.UserId == userId,
+                        cancellationToken);
+
+                    if (user is null)
+                    {
+                        user = new User()
+                        {
+                            UserId = userId,
+                            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
+                            LastName = receivedMessage.From?.LastName ?? string.Empty,
+                            NickName = receivedMessage.From?.Username ?? string.Empty,
+                            WebHookId = Guid.NewGuid(),
+                        };
+                        db!.Context!.Users!.Add(user!);
+                    }
+
+                    user.Status = status;
+                    user.StatusTime = DateTime.Now;
+
+                    await db!.Context.SaveChangesAsync(cancellationToken);
+                }
+
                 await this.SendMessageAsync(
                     botClient,
                     receivedMessage,
-                    "State changed 👌",
+                    "Status changed 👌",
                     ParseMode.MarkdownV2,
                     true,
                     cancellationToken);
