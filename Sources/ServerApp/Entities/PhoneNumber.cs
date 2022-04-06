@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-
-namespace ServerApp.Entities
+﻿namespace ServerApp.Entities
 {
     /// <summary>
     /// Phone number of user.
@@ -8,19 +6,23 @@ namespace ServerApp.Entities
     public class PhoneNumber
     {
         /// <summary>
-        /// Gets or sets a record Id.
+        /// Gets a record Id.
         /// </summary>
-        public long PhoneNumberId { get; set; }
-
-        /// <summary>
-        /// Gets or sets a user who owns the phone number.
-        /// </summary>
-        [ForeignKey("UserId")]
-        public virtual User? User { get; set; }
+        public long Id { get; private set; }
 
         /// <summary>
         /// Gets or sets a phone number value.
         /// </summary>
         public string Number { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets a user's key.
+        /// </summary>
+        public long UserId { get; set; }
+
+        /// <summary>
+        /// Gets or sets a user who owns the phone number.
+        /// </summary>
+        public User? User { get; set; }
     }
 }

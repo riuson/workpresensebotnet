@@ -16,6 +16,7 @@ namespace ServerApp.Database
         /// <param name="options">Context options builder.</param>
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options)
+            : base(options)
         {
             this.options = options;
             this.Users = this.Set<User>();
@@ -26,5 +27,12 @@ namespace ServerApp.Database
         /// Gets or sets a users collection.
         /// </summary>
         public DbSet<User>? Users { get; set; }
+
+        /// <inheritdoc />
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.ApplyConfiguration(new UserConfiguration());
+            modelBuilder.ApplyConfiguration(new PhoneNumberConfiguration());
+        }
     }
 }

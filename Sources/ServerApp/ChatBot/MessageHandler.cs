@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ServerApp.Database;
@@ -81,26 +82,32 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                using (var dbContext = this.serviceProvider.GetService<ApplicationDbContext>())
+                using (var scope = this.serviceProvider.CreateScope())
                 {
-                    var user = await dbContext!.Users!.FindAsync(userId);
-
-                    if (user is null)
+                    using (var dbContext = scope.ServiceProvider.GetService<ApplicationDbContext>())
                     {
-                        user = new User()
+                        var user = await dbContext!.Users!.FirstOrDefaultAsync(
+                            x => x.UserId == userId,
+                            cancellationToken);
+
+                        if (user is null)
                         {
-                            TelegramUserId = userId,
-                            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
-                            LastName = receivedMessage.From?.LastName ?? string.Empty,
-                            NickName = receivedMessage.From?.Username ?? string.Empty,
-                        };
-                        dbContext.Users.Add(user);
+                            user = new User()
+                            {
+                                UserId = userId,
+                                FirstName = receivedMessage.From?.FirstName ?? string.Empty,
+                                LastName = receivedMessage.From?.LastName ?? string.Empty,
+                                NickName = receivedMessage.From?.Username ?? string.Empty,
+                                WebHookId = Guid.NewGuid(),
+                            };
+                            dbContext!.Users!.Add(user!);
+                        }
+
+                        user.Status = status;
+                        user.StatusTime = DateTime.Now;
+
+                        await dbContext.SaveChangesAsync(cancellationToken);
                     }
-
-                    user.Status = status;
-                    user.StatusTime = DateTime.Now;
-
-                    await dbContext.SaveChangesAsync(cancellationToken);
                 }
 
                 await this.SendMessageAsync(

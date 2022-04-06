@@ -34,10 +34,8 @@ internal class Program
                 var configuration = hostingContext.Configuration;
                 services.AddHostedService<TeleBotService>();
                 services.AddTransient<IMessageHandler, MessageHandler>();
-                ////services.AddDbContextFactory<ApplicationDbContext>(optionsBuilder => optionsBuilder.UseSqlite(configuration.GetConnectionString("DatFile2")));
-                ////services.AddDbContext<ApplicationDbContext>();
                 services.AddDbContext<ApplicationDbContext>(options =>
-                    options.UseSqlite(configuration.GetConnectionString("DatFile2")));
+                    options.UseSqlite(configuration.GetConnectionString("DataFile2")));
             })
             .Build();
 
