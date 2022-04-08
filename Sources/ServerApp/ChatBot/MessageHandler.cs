@@ -123,7 +123,7 @@ public class MessageHandler : IMessageHandler
         var chatId = receivedMessage.Chat.Id;
         var sentMessage =
             await botClient.SendTextMessageAsync(
-                chatId: chatId,
+                receivedMessage.From?.Id ?? throw new NullReferenceException("Received message from unknown sender!"),
                 text: content,
                 parseMode: parseMode,
                 replyToMessageId: asReply ? receivedMessage.MessageId : default,
