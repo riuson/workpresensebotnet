@@ -70,6 +70,9 @@ public class MessageHandler : IMessageHandler
             return;
         }
 
+        var telegramChat = receivedMessage.Chat;
+        var isPrivate = telegramChat.Type == ChatType.Private;
+
         switch (commandText)
         {
             case "/came":
@@ -84,16 +87,17 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                await this.UpdateUserStatus(
+                var affectedEntities = await this.UpdateUserStatus(
                     receivedMessage.From!,
-                    receivedMessage.Chat,
+                    telegramChat,
+                    isPrivate,
                     newStatus,
                     cancellationToken);
 
                 await this.SendMessageAsync(
                     botClient,
                     receivedMessage,
-                    "Status changed 👌",
+                    $"Updated entities: {affectedEntities} 👌",
                     ParseMode.MarkdownV2,
                     true,
                     cancellationToken);
@@ -127,9 +131,10 @@ public class MessageHandler : IMessageHandler
         return sentMessage;
     }
 
-    private async Task UpdateUserStatus(
+    private async Task<int> UpdateUserStatus(
         Telegram.Bot.Types.User telegramUser,
         Chat telegramChat,
+        bool isPrivate,
         Status newStatus,
         CancellationToken cancellationToken)
     {
@@ -141,8 +146,6 @@ public class MessageHandler : IMessageHandler
             }
 
             var user = await db.Context.Users
-                ////.Include(x => x.Chats)
-                ////.ThenInclude(x => x.Status)
                 .FirstOrDefaultAsync(
                     x => x.Id == telegramUser.Id,
                     cancellationToken: cancellationToken);
@@ -163,29 +166,43 @@ public class MessageHandler : IMessageHandler
                 await db.Context.Entry(user).Collection(x => x.Chats).LoadAsync();
             }
 
-            var chat = user.Chats.FirstOrDefault(x => x.ChatId == telegramChat.Id);
-
-            if (chat is null)
+            if (isPrivate)
             {
-                chat = new BotChat()
+                // Update all registered chats for user.
+                foreach (var chat in user.Chats)
                 {
-                    User = user,
-                    ChatId = telegramChat.Id,
-                };
-                chat.Status.Chat = chat;
-                chat.Status.HookId = Guid.NewGuid();
-                chat.Status.Status = newStatus;
-                chat.Status.Time = DateTime.Now;
-                db.Context.Chats.Add(chat);
+                    chat.Status.Status = newStatus;
+                    chat.Status.Time = DateTime.Now;
+                }
             }
             else
             {
-                await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
-                chat.Status.Status = newStatus;
-                chat.Status.Time = DateTime.Now;
+                // Update current chat.
+                var chat = user.Chats.FirstOrDefault(x => x.ChatId == telegramChat.Id);
+
+                if (chat is null)
+                {
+                    chat = new BotChat()
+                    {
+                        User = user,
+                        ChatId = telegramChat.Id,
+                    };
+                    chat.Status.Chat = chat;
+                    chat.Status.HookId = Guid.NewGuid();
+                    chat.Status.Status = newStatus;
+                    chat.Status.Time = DateTime.Now;
+                    db.Context.Chats.Add(chat);
+                }
+                else
+                {
+                    await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
+                    chat.Status.Status = newStatus;
+                    chat.Status.Time = DateTime.Now;
+                }
             }
 
-            await db!.Context.SaveChangesAsync(cancellationToken);
+            var affectedEntities = await db!.Context.SaveChangesAsync(cancellationToken);
+            return affectedEntities;
         }
     }
 }
