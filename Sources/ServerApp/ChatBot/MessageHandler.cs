@@ -9,6 +9,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using BotChat = ServerApp.Entities.Chat;
 using BotUser = ServerApp.Entities.User;
+using Chat = Telegram.Bot.Types.Chat;
 
 namespace ServerApp.ChatBot;
 
@@ -83,60 +84,11 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                using (var db = this.serviceProvider.GetService<IDatabase>())
-                {
-                    if (db is null)
-                    {
-                        throw new NullReferenceException("IDatabase resolved as null!");
-                    }
-
-                    var user = await db.Context.Users
-                        ////.Include(x => x.Chats)
-                        ////.ThenInclude(x => x.Status)
-                        .FirstOrDefaultAsync(
-                            x => x.Id == userId,
-                            cancellationToken: cancellationToken);
-
-                    if (user is null)
-                    {
-                        user = new BotUser()
-                        {
-                            Id = userId,
-                            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
-                            LastName = receivedMessage.From?.LastName ?? string.Empty,
-                            NickName = receivedMessage.From?.Username ?? string.Empty,
-                        };
-                        db.Context.Users.Add(user!);
-                    }
-                    else
-                    {
-                        await db.Context.Entry(user).Collection(x => x.Chats).LoadAsync();
-                    }
-
-                    var chat = user.Chats.FirstOrDefault(x => x.ChatId == receivedMessage.Chat.Id);
-
-                    if (chat is null)
-                    {
-                        chat = new BotChat()
-                        {
-                            User = user,
-                            ChatId = receivedMessage.Chat.Id,
-                        };
-                        chat.Status.Chat = chat;
-                        chat.Status.HookId = Guid.NewGuid();
-                        chat.Status.Status = newStatus;
-                        chat.Status.Time = DateTime.Now;
-                        db.Context.Chats.Add(chat);
-                    }
-                    else
-                    {
-                        await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
-                        chat.Status.Status = newStatus;
-                        chat.Status.Time = DateTime.Now;
-                    }
-
-                    await db!.Context.SaveChangesAsync(cancellationToken);
-                }
+                await this.UpdateUserStatus(
+                    receivedMessage.From!,
+                    receivedMessage.Chat,
+                    newStatus,
+                    cancellationToken);
 
                 await this.SendMessageAsync(
                     botClient,
@@ -173,5 +125,67 @@ public class MessageHandler : IMessageHandler
                 replyToMessageId: asReply ? receivedMessage.MessageId : default,
                 cancellationToken: cancellationToken);
         return sentMessage;
+    }
+
+    private async Task UpdateUserStatus(
+        Telegram.Bot.Types.User telegramUser,
+        Chat telegramChat,
+        Status newStatus,
+        CancellationToken cancellationToken)
+    {
+        using (var db = this.serviceProvider.GetService<IDatabase>())
+        {
+            if (db is null)
+            {
+                throw new NullReferenceException("IDatabase resolved as null!");
+            }
+
+            var user = await db.Context.Users
+                ////.Include(x => x.Chats)
+                ////.ThenInclude(x => x.Status)
+                .FirstOrDefaultAsync(
+                    x => x.Id == telegramUser.Id,
+                    cancellationToken: cancellationToken);
+
+            if (user is null)
+            {
+                user = new BotUser()
+                {
+                    Id = telegramUser.Id,
+                    FirstName = telegramUser.FirstName ?? string.Empty,
+                    LastName = telegramUser.LastName ?? string.Empty,
+                    NickName = telegramUser.Username ?? string.Empty,
+                };
+                db.Context.Users.Add(user!);
+            }
+            else
+            {
+                await db.Context.Entry(user).Collection(x => x.Chats).LoadAsync();
+            }
+
+            var chat = user.Chats.FirstOrDefault(x => x.ChatId == telegramChat.Id);
+
+            if (chat is null)
+            {
+                chat = new BotChat()
+                {
+                    User = user,
+                    ChatId = telegramChat.Id,
+                };
+                chat.Status.Chat = chat;
+                chat.Status.HookId = Guid.NewGuid();
+                chat.Status.Status = newStatus;
+                chat.Status.Time = DateTime.Now;
+                db.Context.Chats.Add(chat);
+            }
+            else
+            {
+                await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
+                chat.Status.Status = newStatus;
+                chat.Status.Time = DateTime.Now;
+            }
+
+            await db!.Context.SaveChangesAsync(cancellationToken);
+        }
     }
 }
