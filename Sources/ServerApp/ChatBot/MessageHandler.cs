@@ -82,30 +82,30 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                using (var db = this.serviceProvider.GetService<IDatabase>())
-                {
-                    var user = await db!.Context!.Users!.FirstOrDefaultAsync(
-                        x => x.UserId == userId,
-                        cancellationToken);
+                ////using (var db = this.serviceProvider.GetService<IDatabase>())
+                ////{
+                ////    var user = await db!.Context!.Users!.FirstOrDefaultAsync(
+                ////        x => x.UserId == userId,
+                ////        cancellationToken);
 
-                    if (user is null)
-                    {
-                        user = new User()
-                        {
-                            UserId = userId,
-                            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
-                            LastName = receivedMessage.From?.LastName ?? string.Empty,
-                            NickName = receivedMessage.From?.Username ?? string.Empty,
-                            WebHookId = Guid.NewGuid(),
-                        };
-                        db!.Context!.Users!.Add(user!);
-                    }
+                ////    if (user is null)
+                ////    {
+                ////        user = new User()
+                ////        {
+                ////            UserId = userId,
+                ////            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
+                ////            LastName = receivedMessage.From?.LastName ?? string.Empty,
+                ////            NickName = receivedMessage.From?.Username ?? string.Empty,
+                ////            WebHookId = Guid.NewGuid(),
+                ////        };
+                ////        db!.Context!.Users!.Add(user!);
+                ////    }
 
-                    user.Status = status;
-                    user.StatusTime = DateTime.Now;
+                ////    user.Status = status;
+                ////    user.StatusTime = DateTime.Now;
 
-                    await db!.Context.SaveChangesAsync(cancellationToken);
-                }
+                ////    await db!.Context.SaveChangesAsync(cancellationToken);
+                ////}
 
                 await this.SendMessageAsync(
                     botClient,
