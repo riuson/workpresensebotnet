@@ -47,13 +47,20 @@ public class MessageHandler : IMessageHandler
         // Process only commands.
         if (this.regCommand.IsMatch(messageText))
         {
-            this.logger.LogInformation(
-                $"Received a command '{messageText}' in chat {chatId} from user {receivedMessage.From?.Id}.");
-            await this.ExecuteCommandAsync(
-                botClient,
-                receivedMessage,
-                messageText,
-                cancellationToken);
+            try
+            {
+                this.logger.LogInformation(
+                    $"Received a command '{messageText}' in chat {chatId} from user {receivedMessage.From?.Id}.");
+                await this.ExecuteCommandAsync(
+                    botClient,
+                    receivedMessage,
+                    messageText,
+                    cancellationToken);
+            }
+            catch (Exception exc)
+            {
+                this.logger.LogCritical("Critical error was occur while processing message!", exc);
+            }
         }
     }
 
@@ -98,9 +105,38 @@ public class MessageHandler : IMessageHandler
                     botClient,
                     receivedMessage,
                     $"Updated entities: {affectedEntities} 👌",
-                    ParseMode.MarkdownV2,
-                    true,
+                    ParseMode.Html,
+                    false,
                     cancellationToken);
+                break;
+            }
+
+            case "/start":
+            {
+                if (isPrivate)
+                {
+                    break;
+                }
+
+                var affectedEntities = await this.UpdateUserStatus(
+                    receivedMessage.From!,
+                    telegramChat,
+                    isPrivate,
+                    Status.Unknown,
+                    cancellationToken);
+
+                await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
+                    ParseMode.Html,
+                    false,
+                    cancellationToken);
+                break;
+            }
+
+            case "/end":
+            {
                 break;
             }
 
