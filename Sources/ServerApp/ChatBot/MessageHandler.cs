@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using Telegram.Bot.Types.Enums;
 using BotChat = ServerApp.Entities.Chat;
 using BotUser = ServerApp.Entities.User;
 using Chat = Telegram.Bot.Types.Chat;
+using User = Telegram.Bot.Types.User;
 
 namespace ServerApp.ChatBot;
 
@@ -140,6 +142,25 @@ public class MessageHandler : IMessageHandler
                 break;
             }
 
+            case "/stats":
+            {
+                var msg = await this.GetStats(
+                    botClient,
+                    receivedMessage.From!,
+                    telegramChat,
+                    isPrivate,
+                    cancellationToken);
+
+                await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    msg,
+                    ParseMode.Html,
+                    false,
+                    cancellationToken);
+                break;
+            }
+
             default:
             {
                 this.logger.LogWarning($"Received an unknown command '{commandText}'!");
@@ -240,6 +261,82 @@ public class MessageHandler : IMessageHandler
 
             var affectedEntities = await db!.Context.SaveChangesAsync(cancellationToken);
             return affectedEntities;
+        }
+    }
+
+    private async Task<string> GetStats(
+        ITelegramBotClient botClient,
+        User telegramUser,
+        Chat telegramChat,
+        bool isPrivate,
+        CancellationToken cancellationToken)
+    {
+        using (var db = this.serviceProvider.GetService<IDatabase>())
+        {
+            if (db is null)
+            {
+                throw new NullReferenceException("IDatabase resolved as null!");
+            }
+
+            var user = await db.Context.Users
+                .FirstOrDefaultAsync(
+                    x => x.Id == telegramUser.Id,
+                    cancellationToken: cancellationToken);
+
+            if (user is null)
+            {
+                return "There are no registered chats for this user!";
+            }
+
+            await db.Context.Entry(user).Collection(x => x.Chats).LoadAsync();
+            var chats = isPrivate
+                ? user.Chats.ToArray()
+                : user.Chats.Where(x => x.ChatId == telegramChat.Id).ToArray();
+
+            if (chats.Length == 0)
+            {
+                return "There are no registered chats for this user!";
+            }
+
+            var msg = new StringBuilder();
+
+            foreach (var chat in chats)
+            {
+                var chatInfoTask = botClient.GetChatAsync(new ChatId(chat.ChatId), cancellationToken);
+
+                var sameChats = await db.Context.Chats
+                    .Where(x => x.ChatId == chat.ChatId)
+                    .Include(x => x.User)
+                    .Include(x => x.Status)
+                    .ToListAsync(cancellationToken);
+
+                var chatInfo = await chatInfoTask;
+
+                msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
+                msg.AppendLine("At work 🏢");
+                foreach (var sameChat in sameChats.Where(x => x.Status.Status == Status.CameToWork))
+                {
+                    msg.AppendFormat(
+                        "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
+                        sameChat.User.Id,
+                        sameChat.User.NickName,
+                        sameChat.User.FirstName,
+                        sameChat.User.LastName);
+                }
+
+                msg.AppendLine("At home 🏠");
+                foreach (var sameChat in sameChats.Where(x => x.Status.Status != Status.CameToWork))
+                {
+                    msg.AppendFormat(
+                        "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
+                        sameChat.User.Id,
+                        sameChat.User.NickName,
+                        sameChat.User.FirstName,
+                        sameChat.User.LastName);
+                }
+            }
+
+            return msg.ToString();
         }
     }
 }
