@@ -19,10 +19,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .Property(x => x.Id)
             .HasColumnName("id");
         builder
-            .Property(x => x.UserId)
-            .HasColumnName("user_id")
-            .IsRequired();
-        builder
             .Property(x => x.FirstName)
             .HasColumnName("first_name")
             .IsRequired(false);
@@ -34,19 +30,5 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .Property(x => x.NickName)
             .HasColumnName("nickname")
             .IsRequired(false);
-        builder
-            .Property(x => x.Status)
-            .HasColumnName("status")
-            .IsRequired(true)
-            .HasDefaultValue(Status.Unknown);
-        builder
-            .Property(x => x.StatusTime)
-            .HasColumnName("status_time")
-            .IsRequired(true)
-            .HasDefaultValue(DateTime.MinValue);
-        builder
-            .Property(x => x.WebHookId)
-            .HasColumnName("web_hook_id")
-            .IsRequired(true);
     }
 }

@@ -18,6 +18,7 @@ namespace ServerApp.Database
             var builder = new ConfigurationBuilder();
             builder.SetBasePath(Directory.GetCurrentDirectory());
             builder.AddJsonFile("appsettings.json");
+            builder.AddJsonFile("appsettings.Development.json");
             var config = builder.Build();
 
             var connectionString = config.GetConnectionString("DataFile2");

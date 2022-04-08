@@ -7,7 +7,8 @@ using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using User = ServerApp.Entities.User;
+using BotChat = ServerApp.Entities.Chat;
+using BotUser = ServerApp.Entities.User;
 
 namespace ServerApp.ChatBot;
 
@@ -74,7 +75,7 @@ public class MessageHandler : IMessageHandler
             case "/left":
             case "/stay":
             {
-                var status = commandText switch
+                var newStatus = commandText switch
                 {
                     "/came" => Status.CameToWork,
                     "/left" => Status.LeftWork,
@@ -84,25 +85,55 @@ public class MessageHandler : IMessageHandler
 
                 using (var db = this.serviceProvider.GetService<IDatabase>())
                 {
-                    var user = await db!.Context!.Users!.FirstOrDefaultAsync(
-                        x => x.UserId == userId,
-                        cancellationToken);
+                    if (db is null)
+                    {
+                        throw new NullReferenceException("IDatabase resolved as null!");
+                    }
+
+                    var user = await db.Context.Users
+                        ////.Include(x => x.Chats)
+                        ////.ThenInclude(x => x.Status)
+                        .FirstOrDefaultAsync(
+                            x => x.Id == userId,
+                            cancellationToken: cancellationToken);
 
                     if (user is null)
                     {
-                        user = new User()
+                        user = new BotUser()
                         {
-                            UserId = userId,
+                            Id = userId,
                             FirstName = receivedMessage.From?.FirstName ?? string.Empty,
                             LastName = receivedMessage.From?.LastName ?? string.Empty,
                             NickName = receivedMessage.From?.Username ?? string.Empty,
-                            WebHookId = Guid.NewGuid(),
                         };
-                        db!.Context!.Users!.Add(user!);
+                        db.Context.Users.Add(user!);
+                    }
+                    else
+                    {
+                        await db.Context.Entry(user).Collection(x => x.Chats).LoadAsync();
                     }
 
-                    user.Status = status;
-                    user.StatusTime = DateTime.Now;
+                    var chat = user.Chats.FirstOrDefault(x => x.ChatId == receivedMessage.Chat.Id);
+
+                    if (chat is null)
+                    {
+                        chat = new BotChat()
+                        {
+                            User = user,
+                            ChatId = receivedMessage.Chat.Id,
+                        };
+                        chat.Status.Chat = chat;
+                        chat.Status.HookId = Guid.NewGuid();
+                        chat.Status.Status = newStatus;
+                        chat.Status.Time = DateTime.Now;
+                        db.Context.Chats.Add(chat);
+                    }
+                    else
+                    {
+                        await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
+                        chat.Status.Status = newStatus;
+                        chat.Status.Time = DateTime.Now;
+                    }
 
                     await db!.Context.SaveChangesAsync(cancellationToken);
                 }

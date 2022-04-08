@@ -20,19 +20,39 @@ namespace ServerApp.Database
         {
             this.options = options;
             this.Users = this.Set<User>();
+            this.Phones = this.Set<PhoneNumber>();
+            this.Chats = this.Set<Chat>();
+            this.Statuses = this.Set<ChatStatus>();
             ////this.Database.EnsureCreated();
         }
 
         /// <summary>
         /// Gets or sets a users collection.
         /// </summary>
-        public DbSet<User>? Users { get; set; }
+        public DbSet<User> Users { get; set; }
+
+        /// <summary>
+        /// Gets or sets a phone numbers collection.
+        /// </summary>
+        public DbSet<PhoneNumber> Phones { get; set; }
+
+        /// <summary>
+        /// Gets or sets a chats collection.
+        /// </summary>
+        public DbSet<Chat> Chats { get; set; }
+
+        /// <summary>
+        /// Gets or sets a statuses collection.
+        /// </summary>
+        public DbSet<ChatStatus> Statuses { get; set; }
 
         /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfiguration(new UserConfiguration());
             modelBuilder.ApplyConfiguration(new PhoneNumberConfiguration());
+            modelBuilder.ApplyConfiguration(new ChatConfiguration());
+            modelBuilder.ApplyConfiguration(new ChatStatusConfiguration());
         }
     }
 }
