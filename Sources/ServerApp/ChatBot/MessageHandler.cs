@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ServerApp.Database;
@@ -89,9 +90,12 @@ public class MessageHandler : IMessageHandler
                         throw new NullReferenceException("IDatabase resolved as null!");
                     }
 
-                    var user = await db.Context.Users.FindAsync(
-                        userId,
-                        cancellationToken);
+                    var user = await db.Context.Users
+                        ////.Include(x => x.Chats)
+                        ////.ThenInclude(x => x.Status)
+                        .FirstOrDefaultAsync(
+                            x => x.Id == userId,
+                            cancellationToken: cancellationToken);
 
                     if (user is null)
                     {
@@ -104,6 +108,10 @@ public class MessageHandler : IMessageHandler
                         };
                         db.Context.Users.Add(user!);
                     }
+                    else
+                    {
+                        await db.Context.Entry(user).Collection(x => x.Chats).LoadAsync();
+                    }
 
                     var chat = user.Chats.FirstOrDefault(x => x.ChatId == receivedMessage.Chat.Id);
 
@@ -114,19 +122,17 @@ public class MessageHandler : IMessageHandler
                             User = user,
                             ChatId = receivedMessage.Chat.Id,
                         };
-                        var chatStatus = new ChatStatus()
-                        {
-                            Chat = chat,
-                            HookId = Guid.NewGuid(),
-                            Status = newStatus,
-                            Time = DateTime.Now,
-                        };
+                        chat.Status.Chat = chat;
+                        chat.Status.HookId = Guid.NewGuid();
+                        chat.Status.Status = newStatus;
+                        chat.Status.Time = DateTime.Now;
                         db.Context.Chats.Add(chat);
-                        db.Context.Statuses.Add(chatStatus);
                     }
                     else
                     {
+                        await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
                         chat.Status.Status = newStatus;
+                        chat.Status.Time = DateTime.Now;
                     }
 
                     await db!.Context.SaveChangesAsync(cancellationToken);
