@@ -1,5 +1,4 @@
 ﻿using System.Text.RegularExpressions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ServerApp.Database;
@@ -7,7 +6,8 @@ using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using User = ServerApp.Entities.User;
+using BotChat = ServerApp.Entities.Chat;
+using BotUser = ServerApp.Entities.User;
 
 namespace ServerApp.ChatBot;
 
@@ -74,7 +74,7 @@ public class MessageHandler : IMessageHandler
             case "/left":
             case "/stay":
             {
-                var status = commandText switch
+                var newStatus = commandText switch
                 {
                     "/came" => Status.CameToWork,
                     "/left" => Status.LeftWork,
@@ -82,30 +82,55 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                ////using (var db = this.serviceProvider.GetService<IDatabase>())
-                ////{
-                ////    var user = await db!.Context!.Users!.FirstOrDefaultAsync(
-                ////        x => x.UserId == userId,
-                ////        cancellationToken);
+                using (var db = this.serviceProvider.GetService<IDatabase>())
+                {
+                    if (db is null)
+                    {
+                        throw new NullReferenceException("IDatabase resolved as null!");
+                    }
 
-                ////    if (user is null)
-                ////    {
-                ////        user = new User()
-                ////        {
-                ////            UserId = userId,
-                ////            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
-                ////            LastName = receivedMessage.From?.LastName ?? string.Empty,
-                ////            NickName = receivedMessage.From?.Username ?? string.Empty,
-                ////            WebHookId = Guid.NewGuid(),
-                ////        };
-                ////        db!.Context!.Users!.Add(user!);
-                ////    }
+                    var user = await db.Context.Users.FindAsync(
+                        userId,
+                        cancellationToken);
 
-                ////    user.Status = status;
-                ////    user.StatusTime = DateTime.Now;
+                    if (user is null)
+                    {
+                        user = new BotUser()
+                        {
+                            Id = userId,
+                            FirstName = receivedMessage.From?.FirstName ?? string.Empty,
+                            LastName = receivedMessage.From?.LastName ?? string.Empty,
+                            NickName = receivedMessage.From?.Username ?? string.Empty,
+                        };
+                        db.Context.Users.Add(user!);
+                    }
 
-                ////    await db!.Context.SaveChangesAsync(cancellationToken);
-                ////}
+                    var chat = user.Chats.FirstOrDefault(x => x.ChatId == receivedMessage.Chat.Id);
+
+                    if (chat is null)
+                    {
+                        chat = new BotChat()
+                        {
+                            User = user,
+                            ChatId = receivedMessage.Chat.Id,
+                        };
+                        var chatStatus = new ChatStatus()
+                        {
+                            Chat = chat,
+                            HookId = Guid.NewGuid(),
+                            Status = newStatus,
+                            Time = DateTime.Now,
+                        };
+                        db.Context.Chats.Add(chat);
+                        db.Context.Statuses.Add(chatStatus);
+                    }
+                    else
+                    {
+                        chat.Status.Status = newStatus;
+                    }
+
+                    await db!.Context.SaveChangesAsync(cancellationToken);
+                }
 
                 await this.SendMessageAsync(
                     botClient,
