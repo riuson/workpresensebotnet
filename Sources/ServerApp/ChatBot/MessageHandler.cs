@@ -171,6 +171,7 @@ public class MessageHandler : IMessageHandler
                 // Update all registered chats for user.
                 foreach (var chat in user.Chats)
                 {
+                    await db.Context.Entry(chat).Reference(x => x.Status).LoadAsync();
                     chat.Status.Status = newStatus;
                     chat.Status.Time = DateTime.Now;
                 }
