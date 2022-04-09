@@ -35,6 +35,18 @@ namespace ServerApp.Database
             CancellationToken cancellationToken);
 
         /// <summary>
+        /// Updates status of the user.
+        /// </summary>
+        /// <param name="hookId">Unique for user id of web hook.</param>
+        /// <param name="status">New status of the user.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Status of operation.</returns>
+        Task<(bool isSuccessfull, Status previousStatus, DateTime time)> UpdateUserStatusAsync(
+            Guid hookId,
+            Status status,
+            CancellationToken cancellationToken);
+
+        /// <summary>
         /// Gets stats for chats where user is registered.
         /// </summary>
         /// <param name="userId">User Id (Telegram).</param>

@@ -109,6 +109,27 @@ public class Database : IDatabase
     }
 
     /// <inheritdoc />
+    public async Task<(bool isSuccessfull, Status previousStatus, DateTime time)> UpdateUserStatusAsync(
+        Guid hookId,
+        Status status,
+        CancellationToken cancellationToken)
+    {
+        var statusRecord = await this.context.Statuses
+            .FirstOrDefaultAsync(x => x.HookId == hookId, cancellationToken);
+
+        if (statusRecord is null)
+        {
+            return (false, Status.Unknown, DateTime.Now);
+        }
+
+        var previousStatus = statusRecord.Status;
+        statusRecord.Status = status;
+        statusRecord.Time = DateTime.Now;
+        await this.context.SaveChangesAsync(cancellationToken);
+        return (true, previousStatus, statusRecord.Time);
+    }
+
+    /// <inheritdoc />
     public async Task<Dictionary<long, IEnumerable<Chat>>> GetStatsAsync(
         long userId,
         long chatId,
