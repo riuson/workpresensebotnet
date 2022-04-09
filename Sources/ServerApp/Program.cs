@@ -13,7 +13,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Configuration.AddJsonFile(
     "appsettings.json",
-    optional: true,
+    optional: false,
     reloadOnChange: true);
 builder.Configuration.AddJsonFile(
     $"appsettings.{builder.Environment.EnvironmentName}.json",
@@ -27,6 +27,9 @@ builder.Services.AddTransient<IDatabase, Database>();
 var configuration = builder.Configuration;
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+
+var port = configuration.GetValue<int>("WebHook:Port");
+builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(port));
 
 var app = builder.Build();
 
