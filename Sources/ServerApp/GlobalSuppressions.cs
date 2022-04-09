@@ -15,3 +15,8 @@ using System.Diagnostics.CodeAnalysis;
         "StyleCop.CSharp.DocumentationRules",
         "SA1633:File should have header",
         Justification = "<Ожидание>")]
+[assembly:
+    SuppressMessage(
+        "StyleCop.CSharp.LayoutRules",
+        "SA1516:ElementsMustBeSeparatedByBlankLine",
+        Justification = "Top-level statements in Program.cs in C# 9, look at https://github.com/DotNetAnalyzers/StyleCopAnalyzers/issues/3351")]

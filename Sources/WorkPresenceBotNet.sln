@@ -5,7 +5,12 @@ VisualStudioVersion = 17.0.32014.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServerApp", "ServerApp\ServerApp.csproj", "{F0C9BB65-9336-434A-BB26-ED21B81051C4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerApp.Tests", "ServerApp.Tests\ServerApp.Tests.csproj", "{72DE18A7-3696-4B7B-9B4A-1E3CF2748882}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServerApp.Tests", "ServerApp.Tests\ServerApp.Tests.csproj", "{72DE18A7-3696-4B7B-9B4A-1E3CF2748882}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9BA8D837-924D-42F7-889E-A83E07F1DA1C}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

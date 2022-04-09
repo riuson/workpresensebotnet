@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
-namespace ServerApp.Database;
+﻿namespace ServerApp.Database;
 
 /// <summary>
 /// DB Context helper.

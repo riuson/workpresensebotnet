@@ -1,8 +1,6 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using ServerApp.Database;
 using ServerApp.Entities;
 using Telegram.Bot;
