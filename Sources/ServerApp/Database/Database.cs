@@ -171,6 +171,18 @@ public class Database : IDatabase
         return result;
     }
 
+    /// <inheritdoc />
+    public async Task<Dictionary<long, Guid>> GetHooksAsync(
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        var chats = await this.context.Chats
+            .Where(x => x.UserId == userId)
+            .Include(x => x.Status)
+            .ToListAsync(cancellationToken);
+        return chats.ToDictionary(x => x.ChatId, x => x.Status.HookId);
+    }
+
     /// <summary>
     /// Internal dispose method.
     /// </summary>

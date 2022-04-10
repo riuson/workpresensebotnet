@@ -5,6 +5,7 @@ using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 using BotChat = ServerApp.Entities.Chat;
 
 namespace ServerApp.ChatBot;
@@ -16,6 +17,7 @@ public class MessageHandler : IMessageHandler
 {
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandler> logger;
+    private readonly IConfiguration configuration;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
 
     /// <summary>
@@ -23,13 +25,18 @@ public class MessageHandler : IMessageHandler
     /// </summary>
     /// <param name="serviceProvider">Service provider.</param>
     /// <param name="logger">Logger service.</param>
+    /// <param name="configuration">Configuration data.</param>
     public MessageHandler(
         IServiceProvider serviceProvider,
-        ILogger<MessageHandler> logger)
+        ILogger<MessageHandler> logger,
+        IConfiguration configuration)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
+        this.configuration = configuration;
     }
+
+    private string WebHandlersUriBase => this.configuration.GetValue<string>("WebHook:Uri");
 
     /// <inheritdoc />
     public async Task ProcessTextMessage(
@@ -55,7 +62,7 @@ public class MessageHandler : IMessageHandler
             }
             catch (Exception exc)
             {
-                this.logger.LogCritical("Critical error was occur while processing message!", exc);
+                this.logger.LogCritical(exc, "Critical error was occur while processing message!");
             }
         }
     }
@@ -108,6 +115,7 @@ public class MessageHandler : IMessageHandler
                         $"Updated entities: {affectedEntities} 👌",
                         ParseMode.Html,
                         false,
+                        isPrivate,
                         cancellationToken);
                 }
 
@@ -139,6 +147,7 @@ public class MessageHandler : IMessageHandler
                         $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
                         ParseMode.Html,
                         false,
+                        isPrivate,
                         cancellationToken);
                 }
 
@@ -170,7 +179,45 @@ public class MessageHandler : IMessageHandler
                         msg,
                         ParseMode.Html,
                         false,
+                        isPrivate,
                         cancellationToken);
+                }
+
+                break;
+            }
+
+            case "/web_handlers":
+            {
+                using (var db = this.serviceProvider.GetService<IDatabase>())
+                {
+                    var hooks = await db!.GetHooksAsync(
+                        receivedMessage.From!.Id,
+                        cancellationToken);
+
+                    if (hooks.Count == 0)
+                    {
+                        await this.SendMessageAsync(
+                            botClient,
+                            receivedMessage,
+                            "There are no registered chats for this user!",
+                            ParseMode.Html,
+                            false,
+                            true,
+                            cancellationToken);
+                        return;
+                    }
+
+                    var keyboardMarkup = await this.FormatHooksKeyboardMarkup(
+                        botClient,
+                        hooks,
+                        cancellationToken);
+
+                    var sentMessage = await botClient.SendTextMessageAsync(
+                        receivedMessage.From?.Id ??
+                        throw new NullReferenceException("Received message from unknown sender!"),
+                        text: "Unique link for each chat and action are listed below 👇",
+                        replyMarkup: keyboardMarkup,
+                        cancellationToken: cancellationToken);
                 }
 
                 break;
@@ -190,12 +237,16 @@ public class MessageHandler : IMessageHandler
         string content,
         ParseMode parseMode,
         bool asReply,
+        bool asPrivate,
         CancellationToken cancellationToken)
     {
         var chatId = receivedMessage.Chat.Id;
         var sentMessage =
             await botClient.SendTextMessageAsync(
-                receivedMessage.From?.Id ?? throw new NullReferenceException("Received message from unknown sender!"),
+                asPrivate
+                    ? receivedMessage.From?.Id ??
+                      throw new NullReferenceException("Received message from unknown sender!")
+                    : chatId,
                 text: content,
                 parseMode: parseMode,
                 replyToMessageId: asReply ? receivedMessage.MessageId : default,
@@ -244,5 +295,40 @@ public class MessageHandler : IMessageHandler
         }
 
         return msg.ToString();
+    }
+
+    private async Task<InlineKeyboardMarkup> FormatHooksKeyboardMarkup(
+        ITelegramBotClient botClient,
+        Dictionary<long, Guid> hooks,
+        CancellationToken cancellationToken)
+    {
+        List<IEnumerable<InlineKeyboardButton>> buttons = new ();
+
+        foreach (var pair in hooks)
+        {
+            var chatInfo = await botClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
+            buttons.Add(new[]
+            {
+                InlineKeyboardButton.WithUrl(
+                    "Chat: " + chatInfo!.Title!,
+                    chatInfo!.InviteLink!),
+            });
+            buttons.Add(new[]
+            {
+                InlineKeyboardButton.WithUrl(
+                    "Came to work",
+                    $"{this.WebHandlersUriBase}/{pair.Value}/came"),
+                InlineKeyboardButton.WithUrl(
+                    "Left work",
+                    $"{this.WebHandlersUriBase}/{pair.Value}/left"),
+                InlineKeyboardButton.WithUrl(
+                    "Stay at home",
+                    $"{this.WebHandlersUriBase}/{pair.Value}/stay"),
+            });
+        }
+
+        var inlineKeyboard = new InlineKeyboardMarkup(buttons);
+
+        return inlineKeyboard;
     }
 }

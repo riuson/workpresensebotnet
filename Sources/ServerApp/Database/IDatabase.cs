@@ -59,5 +59,15 @@ namespace ServerApp.Database
             long chatId,
             bool isPrivateChat,
             CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Gets collection of unique web hook Id for user.
+        /// </summary>
+        /// <param name="userId">Id of user.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Collection of unique web hook Id for user in form chatId : hookId.</returns>
+        Task<Dictionary<long, Guid>> GetHooksAsync(
+            long userId,
+            CancellationToken cancellationToken);
     }
 }
