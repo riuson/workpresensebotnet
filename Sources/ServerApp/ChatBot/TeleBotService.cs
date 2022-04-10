@@ -14,27 +14,25 @@ public class TeleBotService : BackgroundService
     private readonly ILogger logger;
     private readonly IHostApplicationLifetime appLifetime;
     private readonly IMessageHandler messageHandler;
-    private readonly TelegramBotClient client;
+    private readonly ITelegramBotClient telegramBotClient;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TeleBotService"/> class.
     /// </summary>
     /// <param name="logger">Logger service.</param>
     /// <param name="appLifetime">Application's lifetime events.</param>
-    /// <param name="config">Configuration.</param>
+    /// <param name="telegramBotClient">Telegram bot client's instance.</param>
     /// <param name="messageHandler">Message handler service.</param>
     public TeleBotService(
         ILogger<TeleBotService> logger,
         IHostApplicationLifetime appLifetime,
-        IConfiguration config,
+        ITelegramBotClient telegramBotClient,
         IMessageHandler messageHandler)
     {
         this.logger = logger;
         this.appLifetime = appLifetime;
         this.messageHandler = messageHandler;
-
-        var token = config.GetValue<string>("TelegramBotToken");
-        this.client = new TelegramBotClient(token);
+        this.telegramBotClient = telegramBotClient;
     }
 
     /// <inheritdoc />
@@ -70,7 +68,7 @@ public class TeleBotService : BackgroundService
 
     private async Task VerifyToken(CancellationToken cancellationToken)
     {
-        var isTokenOk = await this.client.TestApiAsync(cancellationToken);
+        var isTokenOk = await this.telegramBotClient.TestApiAsync(cancellationToken);
 
         if (isTokenOk)
         {
@@ -91,7 +89,7 @@ public class TeleBotService : BackgroundService
                 AllowedUpdates = new UpdateType[] { UpdateType.Message },
             };
 
-            this.client.StartReceiving(
+            this.telegramBotClient.StartReceiving(
                 this.HandleUpdateAsync,
                 this.HandleErrorAsync,
                 receiverOptions,

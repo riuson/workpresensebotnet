@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ServerApp.ChatBot;
 using ServerApp.Database;
+using Telegram.Bot;
 
 var builder = WebApplication.CreateBuilder(Environment.GetCommandLineArgs());
 
@@ -27,6 +28,9 @@ builder.Services.AddTransient<IDatabase, Database>();
 var configuration = builder.Configuration;
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+
+builder.Services.AddSingleton<ITelegramBotClient, TelegramBotClient>(_ =>
+    new TelegramBotClient(configuration.GetValue<string>("TelegramBotToken")));
 
 var port = configuration.GetValue<int>("WebHook:Port");
 builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(port));
