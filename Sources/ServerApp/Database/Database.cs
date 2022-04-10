@@ -224,6 +224,67 @@ public class Database : IDatabase
         return chats.ToDictionary(x => x.ChatId, x => x.HookId);
     }
 
+    /// <inheritdoc />
+    public async Task<(bool isSuccessfull, long messageId, DateTime time)> GetPinnedMessageAsync(
+        long chatId,
+        MessageType messageType,
+        CancellationToken cancellationToken)
+    {
+        var result = await this.context.PinnedMessages
+            .FirstOrDefaultAsync(
+                x => x.ChatId == chatId && x.MessageType == messageType,
+                cancellationToken);
+
+        if (result is null)
+        {
+            return (false, default, default);
+        }
+
+        return (true, result.MessageId, result.Time);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdatePinnedMessageAsync(
+        long chatId,
+        int messageId,
+        MessageType messageType,
+        DateTime time,
+        CancellationToken cancellationToken)
+    {
+        var chat = await this.context.Chats
+            .FirstOrDefaultAsync(
+                x => x.Id == chatId,
+                cancellationToken);
+
+        if (chat is null)
+        {
+            chat = new Chat()
+            {
+                Id = chatId,
+            };
+            this.context.Chats.Add(chat);
+        }
+
+        var pinnedMessage = await this.context.PinnedMessages
+            .FirstOrDefaultAsync(
+                x => x.ChatId == chatId && x.MessageType == messageType,
+                cancellationToken);
+
+        if (pinnedMessage is null)
+        {
+            pinnedMessage = new PinnedMessage()
+            {
+                Chat = chat,
+                MessageId = messageId,
+                Time = time,
+                MessageType = messageType,
+            };
+            this.context.PinnedMessages.Add(pinnedMessage);
+        }
+
+        await this.context.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>
     /// Internal dispose method.
     /// </summary>

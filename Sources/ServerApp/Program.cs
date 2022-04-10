@@ -24,6 +24,7 @@ builder.Configuration.AddJsonFile(
 builder.Services.AddHostedService<TeleBotService>();
 builder.Services.AddTransient<IMessageHandler, MessageHandler>();
 builder.Services.AddTransient<IDatabase, Database>();
+builder.Services.AddSingleton<IPinnedMessagesManager, PinnedMessagesManager>();
 
 var configuration = builder.Configuration;
 builder.Services.AddDbContext<ApplicationDbContext>(options =>

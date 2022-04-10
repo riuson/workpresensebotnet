@@ -7,6 +7,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using BotChat = ServerApp.Entities.Chat;
+using MessageType = ServerApp.Entities.MessageType;
 
 namespace ServerApp.ChatBot;
 
@@ -18,6 +19,7 @@ public class MessageHandler : IMessageHandler
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandler> logger;
     private readonly IConfiguration configuration;
+    private readonly IPinnedMessagesManager pinnedMessagesManager;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
 
     /// <summary>
@@ -26,14 +28,17 @@ public class MessageHandler : IMessageHandler
     /// <param name="serviceProvider">Service provider.</param>
     /// <param name="logger">Logger service.</param>
     /// <param name="configuration">Configuration data.</param>
+    /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
     public MessageHandler(
         IServiceProvider serviceProvider,
         ILogger<MessageHandler> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IPinnedMessagesManager pinnedMessagesManager)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
         this.configuration = configuration;
+        this.pinnedMessagesManager = pinnedMessagesManager;
     }
 
     private string WebHandlersUriBase => this.configuration.GetValue<string>("WebHook:Uri");
@@ -173,7 +178,7 @@ public class MessageHandler : IMessageHandler
                         stats,
                         cancellationToken);
 
-                    await this.SendMessageAsync(
+                    var message = await this.SendMessageAsync(
                         botClient,
                         receivedMessage,
                         msg,
@@ -181,6 +186,15 @@ public class MessageHandler : IMessageHandler
                         false,
                         isPrivate,
                         cancellationToken);
+
+                    if (!isPrivate)
+                    {
+                        await this.pinnedMessagesManager.NewAsync(
+                            telegramChat.Id,
+                            message.MessageId,
+                            MessageType.Status,
+                            cancellationToken);
+                    }
                 }
 
                 break;

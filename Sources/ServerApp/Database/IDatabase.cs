@@ -69,5 +69,33 @@ namespace ServerApp.Database
         Task<Dictionary<long, Guid>> GetHooksAsync(
             long userId,
             CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Gets last pinned message info for chat.
+        /// </summary>
+        /// <param name="chatId">Chat Id.</param>
+        /// <param name="messageType">Type of pinned message.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Pinned message info.</returns>
+        Task<(bool isSuccessfull, long messageId, DateTime time)> GetPinnedMessageAsync(
+            long chatId,
+            MessageType messageType,
+            CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Remember pinned message data.
+        /// </summary>
+        /// <param name="chatId">Chat Id.</param>
+        /// <param name="messageId">Pinned message Id.</param>
+        /// <param name="messageType">Type of pinned message.</param>
+        /// <param name="time">Time of last updating.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task that represents the asynchronous operation.</returns>
+        Task UpdatePinnedMessageAsync(
+            long chatId,
+            int messageId,
+            MessageType messageType,
+            DateTime time,
+            CancellationToken cancellationToken);
     }
 }
