@@ -76,9 +76,9 @@ public class SetStatusController : ControllerBase
 
         if (previousStatus != newStatus)
         {
-            return this.Ok($"Success! Status updated from {previousStatus} to {newStatus} at {time}:");
+            return this.Ok($"Success! Status updated from {previousStatus} to {newStatus} at {time}.");
         }
 
-        return this.Ok($"Success! Status updated to {newStatus} at {time}:");
+        return this.Ok($"Success! Status updated to {newStatus} at {time}.");
     }
 }
