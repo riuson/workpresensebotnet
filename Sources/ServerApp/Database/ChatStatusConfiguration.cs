@@ -22,6 +22,17 @@ public class ChatStatusConfiguration : IEntityTypeConfiguration<ChatStatus>
             .Property(x => x.ChatId)
             .HasColumnName("chat_id");
         builder
+            .HasOne(x => x.Chat)
+            .WithMany(x => x.Statuses)
+            .HasForeignKey(x => x.ChatId);
+        builder
+            .Property(x => x.UserId)
+            .HasColumnName("user_id");
+        builder
+            .HasOne(x => x.User)
+            .WithMany(x => x.Statuses)
+            .HasForeignKey(x => x.UserId);
+        builder
             .Property(x => x.Status)
             .HasColumnName("status")
             .IsRequired();

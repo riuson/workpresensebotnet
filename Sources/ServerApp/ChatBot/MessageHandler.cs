@@ -256,7 +256,7 @@ public class MessageHandler : IMessageHandler
 
     private async Task<string> FormatStats(
         ITelegramBotClient botClient,
-        Dictionary<long, IEnumerable<BotChat>> stats,
+        Dictionary<long, IEnumerable<ChatStatus>> stats,
         CancellationToken cancellationToken)
     {
         if (stats.Count == 0)
@@ -272,22 +272,22 @@ public class MessageHandler : IMessageHandler
 
             msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
             msg.AppendLine("At work 🏢");
-            foreach (var chat in pair.Value.Where(x => x.Status.Status == Status.CameToWork))
+            foreach (var chat in pair.Value.Where(x => x.Status == Status.CameToWork))
             {
                 msg.AppendFormat(
                     "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User.Id,
+                    chat.User!.Id,
                     chat.User.NickName,
                     chat.User.FirstName,
                     chat.User.LastName);
             }
 
             msg.AppendLine("At home 🏠");
-            foreach (var chat in pair.Value.Where(x => x.Status.Status != Status.CameToWork))
+            foreach (var chat in pair.Value.Where(x => x.Status != Status.CameToWork))
             {
                 msg.AppendFormat(
                     "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User.Id,
+                    chat.User!.Id,
                     chat.User.NickName,
                     chat.User.FirstName,
                     chat.User.LastName);

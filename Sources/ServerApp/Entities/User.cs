@@ -6,7 +6,7 @@
 public class User
 {
     /// <summary>
-    /// Gets or sets the user Id in the Telegram, also record Id.
+    /// Gets or sets the user Id.
     /// </summary>
     public long Id { get; set; }
 
@@ -26,9 +26,9 @@ public class User
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets a list of registered chats.
+    /// Gets or sets a list of statuses.
     /// </summary>
-    public List<Chat> Chats { get; set; } = new ();
+    public List<ChatStatus> Statuses { get; set; } = new ();
 
     /// <summary>
     /// Gets or sets a phone numbers.

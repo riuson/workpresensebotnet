@@ -54,7 +54,7 @@ namespace ServerApp.Database
         /// <param name="isPrivateChat">Flag indicating that message was received via private chat.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Dictionary with chatIds and chat records/users/statuses.</returns>
-        Task<Dictionary<long, IEnumerable<Chat>>> GetStatsAsync(
+        Task<Dictionary<long, IEnumerable<ChatStatus>>> GetStatsAsync(
             long userId,
             long chatId,
             bool isPrivateChat,

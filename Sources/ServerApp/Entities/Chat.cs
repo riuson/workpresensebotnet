@@ -6,28 +6,18 @@
     public class Chat
     {
         /// <summary>
-        /// Gets or sets the record Id.
+        /// Gets or sets the chat Id.
         /// </summary>
         public long Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the id of the related user.
+        /// Gets or sets the list of user's statuses for that chat.
         /// </summary>
-        public long UserId { get; set; }
+        public List<ChatStatus> Statuses { get; set; } = new ();
 
         /// <summary>
-        /// Gets or sets the related user.
+        /// Gets or sets the list of pinned status messages for that chat.
         /// </summary>
-        public User User { get; set; } = new ();
-
-        /// <summary>
-        /// Gets or sets the actual (in the Telegram) chat Id.
-        /// </summary>
-        public long ChatId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the status of the user in the chat.
-        /// </summary>
-        public ChatStatus Status { get; set; } = new ();
+        public List<PinnedStatusMessage> PinnedStatusMessages { get; set; } = new ();
     }
 }

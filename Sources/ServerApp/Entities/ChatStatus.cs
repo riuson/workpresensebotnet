@@ -21,6 +21,16 @@ public class ChatStatus
     public Chat? Chat { get; set; }
 
     /// <summary>
+    /// Gets or sets the related user Id.
+    /// </summary>
+    public long UserId { get; set; }
+
+    /// <summary>
+    /// Gets or sets related user.
+    /// </summary>
+    public User? User { get; set; }
+
+    /// <summary>
     /// Gets or sets status for related chat.
     /// </summary>
     public Status Status { get; set; }

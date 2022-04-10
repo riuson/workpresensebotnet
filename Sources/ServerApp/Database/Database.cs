@@ -65,42 +65,51 @@ public class Database : IDatabase
         }
         else
         {
-            await this.context.Entry(user).Collection(x => x.Chats).LoadAsync();
+            await this.context.Entry(user).Collection(x => x.Statuses).LoadAsync();
         }
 
         if (isPrivateChat)
         {
-            // Update all registered chats for user.
-            foreach (var chat in user.Chats)
+            // Update all existing statuses for user.
+            foreach (var userStatus in user.Statuses)
             {
-                await this.context.Entry(chat).Reference(x => x.Status).LoadAsync();
-                chat.Status.Status = status;
-                chat.Status.Time = DateTime.Now;
+                userStatus.Status = status;
+                userStatus.Time = DateTime.Now;
             }
         }
         else
         {
-            // Update current chat.
-            var chat = user.Chats.FirstOrDefault(x => x.ChatId == chatId);
+            // Get chat record.
+            var chat = await this.context.Chats.FirstOrDefaultAsync(x => x.Id == chatId, cancellationToken);
 
             if (chat is null)
             {
                 chat = new Chat()
                 {
-                    User = user,
-                    ChatId = chatId,
+                    Id = chatId,
                 };
-                chat.Status.Chat = chat;
-                chat.Status.HookId = Guid.NewGuid();
-                chat.Status.Status = status;
-                chat.Status.Time = DateTime.Now;
                 this.context.Chats.Add(chat);
+            }
+
+            // Update current chat/user status.
+            var chatStatus = user.Statuses.FirstOrDefault(x => x.ChatId == chatId && x.UserId == userId);
+
+            if (chatStatus is null)
+            {
+                chatStatus = new ChatStatus()
+                {
+                    User = user,
+                    Chat = chat,
+                    HookId = Guid.NewGuid(),
+                    Status = status,
+                    Time = DateTime.Now,
+                };
+                this.context.Statuses.Add(chatStatus);
             }
             else
             {
-                await this.context.Entry(chat).Reference(x => x.Status).LoadAsync();
-                chat.Status.Status = status;
-                chat.Status.Time = DateTime.Now;
+                chatStatus.Status = status;
+                chatStatus.Time = DateTime.Now;
             }
         }
 
@@ -130,7 +139,7 @@ public class Database : IDatabase
     }
 
     /// <inheritdoc />
-    public async Task<Dictionary<long, IEnumerable<Chat>>> GetStatsAsync(
+    public async Task<Dictionary<long, IEnumerable<ChatStatus>>> GetStatsAsync(
         long userId,
         long chatId,
         bool isPrivateChat,
@@ -141,31 +150,63 @@ public class Database : IDatabase
                 x => x.Id == userId,
                 cancellationToken: cancellationToken);
 
+        var selectedChats = new List<Chat>();
+
         if (user is null)
         {
-            return new Dictionary<long, IEnumerable<Chat>>();
+            return new Dictionary<long, IEnumerable<ChatStatus>>();
         }
 
-        await this.context.Entry(user).Collection(x => x.Chats).LoadAsync();
-        var chats = isPrivateChat
-            ? user.Chats.ToArray()
-            : user.Chats.Where(x => x.ChatId == chatId).ToArray();
-
-        if (chats.Length == 0)
+        if (isPrivateChat)
         {
-            return new Dictionary<long, IEnumerable<Chat>>();
+            await this.context.Entry(user)
+                .Collection(x => x.Statuses)
+                .LoadAsync(cancellationToken);
+
+            foreach (var userStatus in user.Statuses)
+            {
+                await this.context.Entry(userStatus)
+                    .Reference(x => x.Chat)
+                    .LoadAsync(cancellationToken);
+
+                if (userStatus.Chat != null)
+                {
+                    selectedChats.Add(userStatus.Chat);
+                }
+            }
+        }
+        else
+        {
+            var chat = await this.context.Chats
+                .FirstOrDefaultAsync(x => x.Id == chatId, cancellationToken);
+
+            if (chat != null)
+            {
+                selectedChats.Add(chat);
+            }
         }
 
-        var result = new Dictionary<long, IEnumerable<Chat>>();
-
-        foreach (var chat in chats)
+        if (selectedChats.Count == 0)
         {
-            var sameChats = await this.context.Chats
-                .Where(x => x.ChatId == chat.ChatId)
-                .Include(x => x.User)
-                .Include(x => x.Status)
-                .ToArrayAsync(cancellationToken);
-            result.Add(chat.ChatId, sameChats);
+            return new Dictionary<long, IEnumerable<ChatStatus>>();
+        }
+
+        var result = new Dictionary<long, IEnumerable<ChatStatus>>();
+
+        foreach (var selectedChat in selectedChats)
+        {
+            await this.context.Entry(selectedChat)
+                .Collection(x => x.Statuses)
+                .LoadAsync(cancellationToken);
+
+            foreach (var selectedChatStatus in selectedChat.Statuses)
+            {
+                await this.context.Entry(selectedChatStatus)
+                    .Reference(x => x.User)
+                    .LoadAsync(cancellationToken);
+            }
+
+            result.Add(selectedChat.Id, selectedChat.Statuses.ToArray());
         }
 
         return result;
@@ -176,11 +217,11 @@ public class Database : IDatabase
         long userId,
         CancellationToken cancellationToken)
     {
-        var chats = await this.context.Chats
+        var chats = await this.context.Statuses
             .Where(x => x.UserId == userId)
-            .Include(x => x.Status)
+            .Include(x => x.Chat)
             .ToListAsync(cancellationToken);
-        return chats.ToDictionary(x => x.ChatId, x => x.Status.HookId);
+        return chats.ToDictionary(x => x.ChatId, x => x.HookId);
     }
 
     /// <summary>

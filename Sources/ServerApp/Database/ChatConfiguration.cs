@@ -18,19 +18,5 @@ public class ChatConfiguration : IEntityTypeConfiguration<Chat>
         builder
             .Property(x => x.Id)
             .HasColumnName("id");
-        builder
-            .Property(x => x.UserId)
-            .HasColumnName("user_id");
-        builder
-            .Property(x => x.ChatId)
-            .HasColumnName("chat_id");
-        builder
-            .HasOne(x => x.User)
-            .WithMany(x => x.Chats)
-            .HasForeignKey(x => x.UserId);
-        builder
-            .HasOne(x => x.Status)
-            .WithOne(x => x.Chat)
-            .HasForeignKey<ChatStatus>(x => x.ChatId);
     }
 }
