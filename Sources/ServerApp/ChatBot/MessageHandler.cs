@@ -18,6 +18,7 @@ public class MessageHandler : IMessageHandler
     private readonly ILogger<MessageHandler> logger;
     private readonly IPinnedMessagesManager pinnedMessagesManager;
     private readonly IDataFormatter dataFormatter;
+    private readonly IDatabase database;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
 
     /// <summary>
@@ -27,16 +28,19 @@ public class MessageHandler : IMessageHandler
     /// <param name="logger">Logger service.</param>
     /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
     /// <param name="dataFormatter">Data formatter serv7ice.</param>
+    /// <param name="database">Database interface.</param>
     public MessageHandler(
         IServiceProvider serviceProvider,
         ILogger<MessageHandler> logger,
         IPinnedMessagesManager pinnedMessagesManager,
-        IDataFormatter dataFormatter)
+        IDataFormatter dataFormatter,
+        IDatabase database)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
         this.pinnedMessagesManager = pinnedMessagesManager;
         this.dataFormatter = dataFormatter;
+        this.database = database;
     }
 
     /// <inheritdoc />
@@ -98,27 +102,24 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                using (var db = this.serviceProvider.GetService<IDatabase>())
-                {
-                    var affectedEntities = await db!.UpdateUserStatusAsync(
-                        receivedMessage.From!.Id,
-                        telegramChat.Id,
-                        isPrivate,
-                        receivedMessage.From?.Username ?? string.Empty,
-                        receivedMessage.From?.FirstName ?? string.Empty,
-                        receivedMessage.From?.LastName ?? string.Empty,
-                        newStatus,
-                        cancellationToken);
+                var affectedEntities = await this.database.UpdateUserStatusAsync(
+                    receivedMessage.From!.Id,
+                    telegramChat.Id,
+                    isPrivate,
+                    receivedMessage.From?.Username ?? string.Empty,
+                    receivedMessage.From?.FirstName ?? string.Empty,
+                    receivedMessage.From?.LastName ?? string.Empty,
+                    newStatus,
+                    cancellationToken);
 
-                    await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        $"Updated entities: {affectedEntities} 👌",
-                        ParseMode.Html,
-                        false,
-                        isPrivate,
-                        cancellationToken);
-                }
+                await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    $"Updated entities: {affectedEntities} 👌",
+                    ParseMode.Html,
+                    false,
+                    isPrivate,
+                    cancellationToken);
 
                 break;
             }
@@ -130,27 +131,24 @@ public class MessageHandler : IMessageHandler
                     break;
                 }
 
-                using (var db = this.serviceProvider.GetService<IDatabase>())
-                {
-                    var affectedEntities = await db!.UpdateUserStatusAsync(
-                        receivedMessage.From!.Id,
-                        telegramChat.Id,
-                        isPrivate,
-                        receivedMessage.From?.Username ?? string.Empty,
-                        receivedMessage.From?.FirstName ?? string.Empty,
-                        receivedMessage.From?.LastName ?? string.Empty,
-                        Status.Unknown,
-                        cancellationToken);
+                var affectedEntities = await this.database.UpdateUserStatusAsync(
+                    receivedMessage.From!.Id,
+                    telegramChat.Id,
+                    isPrivate,
+                    receivedMessage.From?.Username ?? string.Empty,
+                    receivedMessage.From?.FirstName ?? string.Empty,
+                    receivedMessage.From?.LastName ?? string.Empty,
+                    Status.Unknown,
+                    cancellationToken);
 
-                    await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
-                        ParseMode.Html,
-                        false,
-                        isPrivate,
-                        cancellationToken);
-                }
+                await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
+                    ParseMode.Html,
+                    false,
+                    isPrivate,
+                    cancellationToken);
 
                 break;
             }
@@ -162,34 +160,31 @@ public class MessageHandler : IMessageHandler
 
             case "/stats":
             {
-                using (var db = this.serviceProvider.GetService<IDatabase>())
+                var stats = await this.database.GetStatsAsync(
+                    receivedMessage.From!.Id,
+                    telegramChat.Id,
+                    isPrivate,
+                    cancellationToken);
+                var msg = await this.dataFormatter.FormatStats(
+                    stats,
+                    cancellationToken);
+
+                var message = await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    msg,
+                    ParseMode.Html,
+                    false,
+                    isPrivate,
+                    cancellationToken);
+
+                if (!isPrivate)
                 {
-                    var stats = await db!.GetStatsAsync(
-                        receivedMessage.From!.Id,
+                    await this.pinnedMessagesManager.NewAsync(
                         telegramChat.Id,
-                        isPrivate,
+                        message.MessageId,
+                        MessageType.Status,
                         cancellationToken);
-                    var msg = await this.dataFormatter.FormatStats(
-                        stats,
-                        cancellationToken);
-
-                    var message = await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        msg,
-                        ParseMode.Html,
-                        false,
-                        isPrivate,
-                        cancellationToken);
-
-                    if (!isPrivate)
-                    {
-                        await this.pinnedMessagesManager.NewAsync(
-                            telegramChat.Id,
-                            message.MessageId,
-                            MessageType.Status,
-                            cancellationToken);
-                    }
                 }
 
                 break;
@@ -197,36 +192,33 @@ public class MessageHandler : IMessageHandler
 
             case "/web_handlers":
             {
-                using (var db = this.serviceProvider.GetService<IDatabase>())
+                var hooks = await this.database.GetHooksAsync(
+                    receivedMessage.From!.Id,
+                    cancellationToken);
+
+                if (hooks.Count == 0)
                 {
-                    var hooks = await db!.GetHooksAsync(
-                        receivedMessage.From!.Id,
+                    await this.SendMessageAsync(
+                        botClient,
+                        receivedMessage,
+                        "There are no registered chats for this user!",
+                        ParseMode.Html,
+                        false,
+                        true,
                         cancellationToken);
-
-                    if (hooks.Count == 0)
-                    {
-                        await this.SendMessageAsync(
-                            botClient,
-                            receivedMessage,
-                            "There are no registered chats for this user!",
-                            ParseMode.Html,
-                            false,
-                            true,
-                            cancellationToken);
-                        return;
-                    }
-
-                    var keyboardMarkup = await this.dataFormatter.FormatHooksKeyboardMarkup(
-                        hooks,
-                        cancellationToken);
-
-                    var sentMessage = await botClient.SendTextMessageAsync(
-                        receivedMessage.From?.Id ??
-                        throw new NullReferenceException("Received message from unknown sender!"),
-                        text: "Unique link for each chat and action are listed below 👇",
-                        replyMarkup: keyboardMarkup,
-                        cancellationToken: cancellationToken);
+                    return;
                 }
+
+                var keyboardMarkup = await this.dataFormatter.FormatHooksKeyboardMarkup(
+                    hooks,
+                    cancellationToken);
+
+                var sentMessage = await botClient.SendTextMessageAsync(
+                    receivedMessage.From?.Id ??
+                    throw new NullReferenceException("Received message from unknown sender!"),
+                    text: "Unique link for each chat and action are listed below 👇",
+                    replyMarkup: keyboardMarkup,
+                    cancellationToken: cancellationToken);
 
                 break;
             }

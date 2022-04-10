@@ -5,13 +5,8 @@ namespace ServerApp.Database
     /// <summary>
     /// Interface to DBContext with inner scope.
     /// </summary>
-    public interface IDatabase : IDisposable
+    public interface IDatabase
     {
-        /// <summary>
-        /// Gets DB Context.
-        /// </summary>
-        ApplicationDbContext Context { get; }
-
         /// <summary>
         /// Updates status of the user.
         /// </summary>

@@ -22,14 +22,16 @@ builder.Configuration.AddJsonFile(
     reloadOnChange: true);
 
 builder.Services.AddHostedService<TeleBotService>();
-builder.Services.AddTransient<IMessageHandler, MessageHandler>();
-builder.Services.AddTransient<IDatabase, Database>();
+builder.Services.AddSingleton<IMessageHandler, MessageHandler>();
+builder.Services.AddSingleton<IDatabase, Database>();
 builder.Services.AddSingleton<IPinnedMessagesManager, PinnedMessagesManager>();
 builder.Services.AddSingleton<IDataFormatter, DataFormatter>();
 
 var configuration = builder.Configuration;
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+builder.Services.AddDbContext<ApplicationDbContext>(
+    contextLifetime: ServiceLifetime.Singleton,
+    optionsAction: options =>
+        options.UseSqlite(configuration.GetConnectionString("DataFile2")));
 
 builder.Services.AddSingleton<ITelegramBotClient, TelegramBotClient>(_ =>
     new TelegramBotClient(configuration.GetValue<string>("TelegramBotToken")));
