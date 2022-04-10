@@ -1,11 +1,9 @@
-﻿using System.Text;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using ServerApp.Database;
 using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 using BotChat = ServerApp.Entities.Chat;
 using MessageType = ServerApp.Entities.MessageType;
 
@@ -18,8 +16,8 @@ public class MessageHandler : IMessageHandler
 {
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandler> logger;
-    private readonly IConfiguration configuration;
     private readonly IPinnedMessagesManager pinnedMessagesManager;
+    private readonly IDataFormatter dataFormatter;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
 
     /// <summary>
@@ -27,21 +25,19 @@ public class MessageHandler : IMessageHandler
     /// </summary>
     /// <param name="serviceProvider">Service provider.</param>
     /// <param name="logger">Logger service.</param>
-    /// <param name="configuration">Configuration data.</param>
     /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
+    /// <param name="dataFormatter">Data formatter serv7ice.</param>
     public MessageHandler(
         IServiceProvider serviceProvider,
         ILogger<MessageHandler> logger,
-        IConfiguration configuration,
-        IPinnedMessagesManager pinnedMessagesManager)
+        IPinnedMessagesManager pinnedMessagesManager,
+        IDataFormatter dataFormatter)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
-        this.configuration = configuration;
         this.pinnedMessagesManager = pinnedMessagesManager;
+        this.dataFormatter = dataFormatter;
     }
-
-    private string WebHandlersUriBase => this.configuration.GetValue<string>("WebHook:Uri");
 
     /// <inheritdoc />
     public async Task ProcessTextMessage(
@@ -173,8 +169,7 @@ public class MessageHandler : IMessageHandler
                         telegramChat.Id,
                         isPrivate,
                         cancellationToken);
-                    var msg = await this.FormatStats(
-                        botClient,
+                    var msg = await this.dataFormatter.FormatStats(
                         stats,
                         cancellationToken);
 
@@ -221,8 +216,7 @@ public class MessageHandler : IMessageHandler
                         return;
                     }
 
-                    var keyboardMarkup = await this.FormatHooksKeyboardMarkup(
-                        botClient,
+                    var keyboardMarkup = await this.dataFormatter.FormatHooksKeyboardMarkup(
                         hooks,
                         cancellationToken);
 
@@ -266,83 +260,5 @@ public class MessageHandler : IMessageHandler
                 replyToMessageId: asReply ? receivedMessage.MessageId : default,
                 cancellationToken: cancellationToken);
         return sentMessage;
-    }
-
-    private async Task<string> FormatStats(
-        ITelegramBotClient botClient,
-        Dictionary<long, IEnumerable<ChatStatus>> stats,
-        CancellationToken cancellationToken)
-    {
-        if (stats.Count == 0)
-        {
-            return "There are no registered chats for this user!";
-        }
-
-        var msg = new StringBuilder();
-
-        foreach (var pair in stats)
-        {
-            var chatInfo = await botClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
-
-            msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
-            msg.AppendLine("At work 🏢");
-            foreach (var chat in pair.Value.Where(x => x.Status == Status.CameToWork))
-            {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User!.Id,
-                    chat.User.NickName,
-                    chat.User.FirstName,
-                    chat.User.LastName);
-            }
-
-            msg.AppendLine("At home 🏠");
-            foreach (var chat in pair.Value.Where(x => x.Status != Status.CameToWork))
-            {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User!.Id,
-                    chat.User.NickName,
-                    chat.User.FirstName,
-                    chat.User.LastName);
-            }
-        }
-
-        return msg.ToString();
-    }
-
-    private async Task<InlineKeyboardMarkup> FormatHooksKeyboardMarkup(
-        ITelegramBotClient botClient,
-        Dictionary<long, Guid> hooks,
-        CancellationToken cancellationToken)
-    {
-        List<IEnumerable<InlineKeyboardButton>> buttons = new ();
-
-        foreach (var pair in hooks)
-        {
-            var chatInfo = await botClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
-            buttons.Add(new[]
-            {
-                InlineKeyboardButton.WithUrl(
-                    "Chat: " + chatInfo!.Title!,
-                    chatInfo!.InviteLink!),
-            });
-            buttons.Add(new[]
-            {
-                InlineKeyboardButton.WithUrl(
-                    "Came to work",
-                    $"{this.WebHandlersUriBase}/{pair.Value}/came"),
-                InlineKeyboardButton.WithUrl(
-                    "Left work",
-                    $"{this.WebHandlersUriBase}/{pair.Value}/left"),
-                InlineKeyboardButton.WithUrl(
-                    "Stay at home",
-                    $"{this.WebHandlersUriBase}/{pair.Value}/stay"),
-            });
-        }
-
-        var inlineKeyboard = new InlineKeyboardMarkup(buttons);
-
-        return inlineKeyboard;
     }
 }
