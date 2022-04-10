@@ -23,7 +23,7 @@ namespace ServerApp.Database
             this.Phones = this.Set<PhoneNumber>();
             this.Chats = this.Set<Chat>();
             this.Statuses = this.Set<ChatStatus>();
-            this.PinnedStatuses = this.Set<PinnedStatusMessage>();
+            this.PinnedStatuses = this.Set<PinnedMessage>();
             ////this.Database.EnsureCreated();
         }
 
@@ -50,7 +50,7 @@ namespace ServerApp.Database
         /// <summary>
         /// Gets or sets a pinned status messages collection.
         /// </summary>
-        public DbSet<PinnedStatusMessage> PinnedStatuses { get; set; }
+        public DbSet<PinnedMessage> PinnedStatuses { get; set; }
 
         /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,7 +59,7 @@ namespace ServerApp.Database
             modelBuilder.ApplyConfiguration(new PhoneNumberConfiguration());
             modelBuilder.ApplyConfiguration(new ChatConfiguration());
             modelBuilder.ApplyConfiguration(new ChatStatusConfiguration());
-            modelBuilder.ApplyConfiguration(new PinnedStatusesConfiguration());
+            modelBuilder.ApplyConfiguration(new PinnedMessageConfiguration());
         }
     }
 }

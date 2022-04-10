@@ -5,15 +5,15 @@ using ServerApp.Entities;
 namespace ServerApp.Database;
 
 /// <summary>
-/// Configuration of <see cref="PinnedStatusMessage"/> entity.
+/// Configuration of <see cref="PinnedMessage"/> entity.
 /// </summary>
-public class PinnedStatusesConfiguration : IEntityTypeConfiguration<PinnedStatusMessage>
+public class PinnedMessageConfiguration : IEntityTypeConfiguration<PinnedMessage>
 {
     /// <inheritdoc />
-    public void Configure(EntityTypeBuilder<PinnedStatusMessage> builder)
+    public void Configure(EntityTypeBuilder<PinnedMessage> builder)
     {
         builder
-            .ToTable("pinned_statuses")
+            .ToTable("pinned_messages")
             .HasKey(x => x.Id);
         builder
             .Property(x => x.Id)
@@ -29,6 +29,10 @@ public class PinnedStatusesConfiguration : IEntityTypeConfiguration<PinnedStatus
         builder
             .Property(x => x.Time)
             .HasColumnName("time")
+            .IsRequired();
+        builder
+            .Property(x => x.MessageType)
+            .HasColumnName("message_type")
             .IsRequired();
         builder
             .HasOne(x => x.Chat)

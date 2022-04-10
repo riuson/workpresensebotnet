@@ -18,6 +18,6 @@
         /// <summary>
         /// Gets or sets the list of pinned status messages for that chat.
         /// </summary>
-        public List<PinnedStatusMessage> PinnedStatusMessages { get; set; } = new ();
+        public List<PinnedMessage> PinnedStatusMessages { get; set; } = new ();
     }
 }

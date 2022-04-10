@@ -1,9 +1,9 @@
 ﻿namespace ServerApp.Entities
 {
     /// <summary>
-    /// Pinned status message for chat.
+    /// Pinned message in a chat.
     /// </summary>
-    public class PinnedStatusMessage
+    public class PinnedMessage
     {
         /// <summary>
         /// Gets or sets the record Id.
@@ -24,6 +24,11 @@
         /// Gets or sets a pinned message's Id.
         /// </summary>
         public long MessageId { get; set; }
+
+        /// <summary>
+        /// Gets or sets a pinned message type.
+        /// </summary>
+        public MessageType MessageType { get; set; }
 
         /// <summary>
         /// Gets or sets last time of pinned message update.
