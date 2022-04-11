@@ -1,7 +1,8 @@
-﻿using ServerApp.Database;
+﻿using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using ServerApp.Database;
+using ServerApp.Entities;
 using Telegram.Bot;
-using Telegram.Bot.Types.Enums;
-using MessageType = ServerApp.Entities.MessageType;
 
 namespace ServerApp.ChatBot;
 
@@ -13,6 +14,7 @@ public class PinnedMessagesManager : IPinnedMessagesManager
     private readonly ILogger<PinnedMessagesManager> logger;
     private readonly ITelegramBotClient telegramBotClient;
     private readonly IDatabase database;
+    private readonly ConcurrentDictionary<long, ManualResetEventSlim> events = new ();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PinnedMessagesManager"/> class.
@@ -83,34 +85,31 @@ public class PinnedMessagesManager : IPinnedMessagesManager
     }
 
     /// <inheritdoc />
-    public async Task UpdateAsync(
-        long chatId,
-        string text,
-        MessageType messageType,
-        CancellationToken cancellationToken)
+    public void MarkChat(long chatId)
     {
-        var (success, previousMessageId, time) = await this.database.GetPinnedMessageAsync(
+        this.events.AddOrUpdate(
             chatId,
-            messageType,
-            cancellationToken);
+            new ManualResetEventSlim(true),
+            (_, item) =>
+            {
+                item.Set();
+                return item;
+            });
+    }
 
-        if (success)
-        {
-            try
-            {
-                await this.telegramBotClient.EditMessageTextAsync(
-                    chatId,
-                    (int)previousMessageId,
-                    text,
-                    ParseMode.Html,
-                    cancellationToken: cancellationToken);
-            }
-            catch (Exception exc)
-            {
-                this.logger.LogWarning(
-                    exc,
-                    $"Problem occur while updating message {previousMessageId} in chat {chatId}.");
-            }
-        }
+    /// <inheritdoc />
+    public ManualResetEventSlim GetChatEvent(long chatId)
+    {
+        return this.events.GetOrAdd(
+            chatId,
+            _ => new ManualResetEventSlim(false));
+    }
+
+    /// <inheritdoc />
+    public IEnumerable<(long chatId, ManualResetEventSlim mre)> GetChatEvents()
+    {
+        return this.events.ToImmutableArray()
+            .Select(x => (x.Key, x.Value))
+            .ToArray();
     }
 }

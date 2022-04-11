@@ -22,17 +22,22 @@ namespace ServerApp.ChatBot
             CancellationToken cancellationToken);
 
         /// <summary>
-        /// Update previously pinned message in the chat. If there is no pinned messages, create new.
+        /// Mark chat to update pinned messages. Update processed in separate task.
         /// </summary>
         /// <param name="chatId">Id of chat.</param>
-        /// <param name="text">Text of message.</param>
-        /// <param name="messageType">Type of message.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        Task UpdateAsync(
-            long chatId,
-            string text,
-            MessageType messageType,
-            CancellationToken cancellationToken);
+        void MarkChat(long chatId);
+
+        /// <summary>
+        /// Gets <see cref="ManualResetEventSlim"/> for chat.
+        /// </summary>
+        /// <param name="chatId">Id of chat.</param>
+        /// <returns>Event for specified chat.</returns>
+        ManualResetEventSlim GetChatEvent(long chatId);
+
+        /// <summary>
+        /// Gets collection of chatIds and corresponding <see cref="ManualResetEventSlim"/>.
+        /// </summary>
+        /// <returns>collection of chatIds and corresponding <see cref="ManualResetEventSlim"/>.</returns>
+        IEnumerable<(long chatId, ManualResetEventSlim mre)> GetChatEvents();
     }
 }

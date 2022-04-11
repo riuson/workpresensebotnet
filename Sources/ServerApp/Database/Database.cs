@@ -135,12 +135,7 @@ public class Database : IDatabase
 
         var selectedChats = new List<Chat>();
 
-        if (user is null)
-        {
-            return new Dictionary<long, IEnumerable<ChatStatus>>();
-        }
-
-        if (isPrivateChat)
+        if (isPrivateChat && user is not null)
         {
             await this.context.Entry(user)
                 .Collection(x => x.Statuses)
@@ -158,7 +153,7 @@ public class Database : IDatabase
                 }
             }
         }
-        else
+        else if (!isPrivateChat)
         {
             var chat = await this.context.Chats
                 .FirstOrDefaultAsync(x => x.Id == chatId, cancellationToken);
@@ -167,6 +162,10 @@ public class Database : IDatabase
             {
                 selectedChats.Add(chat);
             }
+        }
+        else
+        {
+            return new Dictionary<long, IEnumerable<ChatStatus>>();
         }
 
         if (selectedChats.Count == 0)

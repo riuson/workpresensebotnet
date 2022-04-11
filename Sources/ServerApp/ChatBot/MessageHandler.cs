@@ -121,6 +121,20 @@ public class MessageHandler : IMessageHandler
                     isPrivate,
                     cancellationToken);
 
+                if (isPrivate)
+                {
+                    var items = this.pinnedMessagesManager.GetChatEvents();
+                    foreach (var item in items)
+                    {
+                        item.mre.Set();
+                    }
+                }
+                else
+                {
+                    var item = this.pinnedMessagesManager.GetChatEvent(telegramChat.Id);
+                    item.Set();
+                }
+
                 break;
             }
 
