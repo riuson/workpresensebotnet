@@ -40,7 +40,7 @@ public class DataFormatter : IDataFormatter
             return "There are no registered chats for this user!";
         }
 
-        var msg = new StringBuilder();
+        var msg = new StringBuilder($"<i>Data as of {DateTime.Now:yyyy-MM-dd HH:mm:ss}</i>\n\n");
 
         foreach (var chat in chats)
         {
