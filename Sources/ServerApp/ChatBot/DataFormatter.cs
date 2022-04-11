@@ -3,6 +3,7 @@ using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
+using BotChat = ServerApp.Entities.Chat;
 
 namespace ServerApp.ChatBot;
 
@@ -31,41 +32,41 @@ public class DataFormatter : IDataFormatter
 
     /// <inheritdoc />
     public async Task<string> FormatStats(
-        Dictionary<long, IEnumerable<ChatStatus>> stats,
+        IEnumerable<BotChat> chats,
         CancellationToken cancellationToken)
     {
-        if (stats.Count == 0)
+        if (!chats.Any())
         {
             return "There are no registered chats for this user!";
         }
 
         var msg = new StringBuilder();
 
-        foreach (var pair in stats)
+        foreach (var chat in chats)
         {
-            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
+            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chat.Id), cancellationToken);
 
             msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
             msg.AppendLine("At work 🏢");
-            foreach (var chat in pair.Value.Where(x => x.Status == Status.CameToWork))
+            foreach (var chatStatus in chat.Statuses.Where(x => x.Status == Status.CameToWork))
             {
                 msg.AppendFormat(
                     "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User!.Id,
-                    chat.User.NickName,
-                    chat.User.FirstName,
-                    chat.User.LastName);
+                    chatStatus.User!.Id,
+                    chatStatus.User.NickName,
+                    chatStatus.User.FirstName,
+                    chatStatus.User.LastName);
             }
 
             msg.AppendLine("At home 🏠");
-            foreach (var chat in pair.Value.Where(x => x.Status != Status.CameToWork))
+            foreach (var chatStatus in chat.Statuses.Where(x => x.Status != Status.CameToWork))
             {
                 msg.AppendFormat(
                     "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User!.Id,
-                    chat.User.NickName,
-                    chat.User.FirstName,
-                    chat.User.LastName);
+                    chatStatus.User!.Id,
+                    chatStatus.User.NickName,
+                    chatStatus.User.FirstName,
+                    chatStatus.User.LastName);
             }
         }
 

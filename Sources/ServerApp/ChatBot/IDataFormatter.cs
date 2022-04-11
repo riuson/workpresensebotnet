@@ -11,11 +11,11 @@ namespace ServerApp.ChatBot
         /// <summary>
         /// Format user's location statistics data.
         /// </summary>
-        /// <param name="stats">Source statistics data collection.</param>
+        /// <param name="chats">Source chats.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Formatted data.</returns>
         Task<string> FormatStats(
-            Dictionary<long, IEnumerable<ChatStatus>> stats,
+            IEnumerable<Chat> chats,
             CancellationToken cancellationToken);
 
         /// <summary>

@@ -18,8 +18,11 @@ namespace ServerApp.Database
         /// <param name="lastName">Last name of the user.</param>
         /// <param name="status">New status of the user.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Count of affected entities in the database.</returns>
-        Task<int> UpdateUserStatusAsync(
+        /// <returns>
+        ///     A task that represents the asynchronous operation.
+        ///     The task result contains Ids of affected chats.
+        /// </returns>
+        Task<IEnumerable<long>> UpdateUserStatusAsync(
             long userId,
             long chatId,
             bool isPrivateChat,
@@ -48,8 +51,11 @@ namespace ServerApp.Database
         /// <param name="chatId">Chat Id (Telegram).</param>
         /// <param name="isPrivateChat">Flag indicating that message was received via private chat.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Dictionary with chatIds and chat records/users/statuses.</returns>
-        Task<Dictionary<long, IEnumerable<ChatStatus>>> GetStatsAsync(
+        /// <returns>
+        ///     A task that represents the asynchronous operation.
+        ///     The task result contains collection of chat with references to chat statuses and users.
+        /// </returns>
+        Task<IEnumerable<Chat>> GetStatsAsync(
             long userId,
             long chatId,
             bool isPrivateChat,

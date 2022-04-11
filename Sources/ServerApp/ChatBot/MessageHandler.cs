@@ -102,7 +102,7 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                var affectedEntities = await this.database.UpdateUserStatusAsync(
+                var chats = await this.database.UpdateUserStatusAsync(
                     receivedMessage.From!.Id,
                     telegramChat.Id,
                     isPrivate,
@@ -115,7 +115,7 @@ public class MessageHandler : IMessageHandler
                 await this.SendMessageAsync(
                     botClient,
                     receivedMessage,
-                    $"Updated entities: {affectedEntities} 👌",
+                    $"Updated chats: {chats.Count()} 👌",
                     ParseMode.Html,
                     false,
                     isPrivate,
@@ -123,10 +123,10 @@ public class MessageHandler : IMessageHandler
 
                 if (isPrivate)
                 {
-                    var items = this.pinnedMessagesManager.GetChatEvents();
-                    foreach (var item in items)
+                    foreach (var chatId in chats)
                     {
-                        item.mre.Set();
+                        var item = this.pinnedMessagesManager.GetChatEvent(chatId);
+                        item.Set();
                     }
                 }
                 else
@@ -174,13 +174,13 @@ public class MessageHandler : IMessageHandler
 
             case "/stats":
             {
-                var stats = await this.database.GetStatsAsync(
+                var chats = await this.database.GetStatsAsync(
                     receivedMessage.From!.Id,
                     telegramChat.Id,
                     isPrivate,
                     cancellationToken);
                 var msg = await this.dataFormatter.FormatStats(
-                    stats,
+                    chats,
                     cancellationToken);
 
                 var message = await this.SendMessageAsync(
