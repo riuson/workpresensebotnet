@@ -25,7 +25,7 @@ builder.Services.AddHostedService<TeleBotService>();
 builder.Services.AddSingleton<IMessageHandler, MessageHandler>();
 builder.Services.AddSingleton<IDatabase, Database>();
 builder.Services.AddSingleton<IDataFormatter, DataFormatter>();
-
+builder.Services.AddSingleton<IScheduledMessageRemover, ScheduledMessageRemover>();
 builder.Services.AddHostedService<BackgroundChatProcessor>();
 builder.Services.AddSingleton<IPinnedMessagesManager, PinnedMessagesManager>();
 

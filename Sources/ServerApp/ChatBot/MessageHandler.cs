@@ -20,6 +20,7 @@ public class MessageHandler : IMessageHandler
     private readonly IDataFormatter dataFormatter;
     private readonly IDatabase database;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
+    private readonly IScheduledMessageRemover scheduledMessageRemover;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageHandler"/> class.
@@ -29,18 +30,21 @@ public class MessageHandler : IMessageHandler
     /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
     /// <param name="dataFormatter">Data formatter serv7ice.</param>
     /// <param name="database">Database interface.</param>
+    /// <param name="scheduledMessageRemover">Scheduler for removing messages.</param>
     public MessageHandler(
         IServiceProvider serviceProvider,
         ILogger<MessageHandler> logger,
         IPinnedMessagesManager pinnedMessagesManager,
         IDataFormatter dataFormatter,
-        IDatabase database)
+        IDatabase database,
+        IScheduledMessageRemover scheduledMessageRemover)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
         this.pinnedMessagesManager = pinnedMessagesManager;
         this.dataFormatter = dataFormatter;
         this.database = database;
+        this.scheduledMessageRemover = scheduledMessageRemover;
     }
 
     /// <inheritdoc />
@@ -112,10 +116,10 @@ public class MessageHandler : IMessageHandler
                     newStatus,
                     cancellationToken);
 
-                await this.SendMessageAsync(
+                var answerMessage = await this.SendMessageAsync(
                     botClient,
                     receivedMessage,
-                    $"Updated chats: {chats.Count()} 👌",
+                    $"Status updated. 👌",
                     ParseMode.Html,
                     false,
                     isPrivate,
@@ -133,6 +137,18 @@ public class MessageHandler : IMessageHandler
                 {
                     var item = this.pinnedMessagesManager.GetChatEvent(telegramChat.Id);
                     item.Set();
+
+                    await this.scheduledMessageRemover.RemoveAfterAsync(
+                        telegramChat.Id,
+                        receivedMessage.MessageId,
+                        TimeSpan.FromMinutes(5),
+                        cancellationToken);
+
+                    await this.scheduledMessageRemover.RemoveAfterAsync(
+                        telegramChat.Id,
+                        answerMessage.MessageId,
+                        TimeSpan.FromMinutes(5),
+                        cancellationToken);
                 }
 
                 break;
@@ -198,6 +214,12 @@ public class MessageHandler : IMessageHandler
                         telegramChat.Id,
                         message.MessageId,
                         MessageType.Status,
+                        cancellationToken);
+
+                    await this.scheduledMessageRemover.RemoveAfterAsync(
+                        telegramChat.Id,
+                        receivedMessage.MessageId,
+                        TimeSpan.FromMinutes(5),
                         cancellationToken);
                 }
 

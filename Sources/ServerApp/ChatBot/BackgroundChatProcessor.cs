@@ -15,6 +15,7 @@ public class BackgroundChatProcessor : BackgroundService
     private readonly IDatabase database;
     private readonly IDataFormatter dataFormatter;
     private readonly IPinnedMessagesManager pinnedMessagesManager;
+    private readonly IScheduledMessageRemover scheduledMessageRemover;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BackgroundChatProcessor"/> class.
@@ -24,18 +25,21 @@ public class BackgroundChatProcessor : BackgroundService
     /// <param name="database">Database.</param>
     /// <param name="dataFormatter">Data formatter service.</param>
     /// <param name="pinnedMessagesManager">Manager of pinned messages.</param>
+    /// <param name="scheduledMessageRemover">Scheduler for removing messages.</param>
     public BackgroundChatProcessor(
         ILogger<BackgroundChatProcessor> logger,
         ITelegramBotClient telegramBotClient,
         IDatabase database,
         IDataFormatter dataFormatter,
-        IPinnedMessagesManager pinnedMessagesManager)
+        IPinnedMessagesManager pinnedMessagesManager,
+        IScheduledMessageRemover scheduledMessageRemover)
     {
         this.logger = logger;
         this.telegramBotClient = telegramBotClient;
         this.database = database;
         this.dataFormatter = dataFormatter;
         this.pinnedMessagesManager = pinnedMessagesManager;
+        this.scheduledMessageRemover = scheduledMessageRemover;
     }
 
     /// <inheritdoc />
@@ -48,7 +52,8 @@ public class BackgroundChatProcessor : BackgroundService
             // Until service shutdown.
             while (!cancellationToken.IsCancellationRequested)
             {
-                await this.UpdatePinnedStatuses(cancellationToken);
+                await this.UpdatePinnedStatusesAsync(cancellationToken);
+                await this.RemoveScheduledMessagesAsync(cancellationToken);
                 await Task.Delay(5000, cancellationToken);
             }
         }
@@ -65,7 +70,7 @@ public class BackgroundChatProcessor : BackgroundService
         }
     }
 
-    private async Task UpdatePinnedStatuses(
+    private async Task UpdatePinnedStatusesAsync(
         CancellationToken cancellationToken)
     {
         // Get sync event for chat.
@@ -107,6 +112,30 @@ public class BackgroundChatProcessor : BackgroundService
                         item.mre.Reset();
                     }
                 }
+            }
+        }
+    }
+
+    private async Task RemoveScheduledMessagesAsync(
+        CancellationToken cancellationToken)
+    {
+        var items = await this.scheduledMessageRemover.GetMessagesForRemovingAsync(
+            cancellationToken);
+
+        foreach (var item in items)
+        {
+            try
+            {
+                await this.telegramBotClient.DeleteMessageAsync(
+                    item.chatId,
+                    (int)item.messageId,
+                    cancellationToken);
+            }
+            catch (Exception exc)
+            {
+                this.logger.LogWarning(
+                    exc,
+                    $"Problem occur while removing message {item.messageId} in chat {item.chatId}.");
             }
         }
     }
