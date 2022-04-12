@@ -33,7 +33,7 @@ var configuration = builder.Configuration;
 builder.Services.AddDbContext<ApplicationDbContext>(
     contextLifetime: ServiceLifetime.Singleton,
     optionsAction: options =>
-        options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+        options.UseSqlite(configuration.GetConnectionString("Database")));
 
 builder.Services.AddSingleton<ITelegramBotClient, TelegramBotClient>(_ =>
     new TelegramBotClient(configuration.GetValue<string>("TelegramBotToken")));
