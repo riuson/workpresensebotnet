@@ -9,7 +9,7 @@ namespace ServerApp.Controllers;
 /// Controller for statuses.
 /// </summary>
 [ApiController]
-[Route("[controller]")]
+[Route("/")]
 public class SetStatusController : ControllerBase
 {
     private readonly ILogger<SetStatusController> logger;
