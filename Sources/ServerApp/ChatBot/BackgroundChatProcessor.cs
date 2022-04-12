@@ -6,26 +6,26 @@ using MessageType = ServerApp.Entities.MessageType;
 namespace ServerApp.ChatBot;
 
 /// <summary>
-/// Updater of pinned messages.
+/// Processes chat-related tasks in background.
 /// </summary>
-public class PinnedMessagesUpdater : BackgroundService
+public class BackgroundChatProcessor : BackgroundService
 {
-    private readonly ILogger<PinnedMessagesUpdater> logger;
+    private readonly ILogger<BackgroundChatProcessor> logger;
     private readonly ITelegramBotClient telegramBotClient;
     private readonly IDatabase database;
     private readonly IDataFormatter dataFormatter;
     private readonly IPinnedMessagesManager pinnedMessagesManager;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PinnedMessagesUpdater"/> class.
+    /// Initializes a new instance of the <see cref="BackgroundChatProcessor"/> class.
     /// </summary>
     /// <param name="logger">Logger.</param>
     /// <param name="telegramBotClient">Telegram bot client.</param>
     /// <param name="database">Database.</param>
-    /// <param name="dataFormatter">Data formatter serv7ice.</param>
+    /// <param name="dataFormatter">Data formatter service.</param>
     /// <param name="pinnedMessagesManager">Manager of pinned messages.</param>
-    public PinnedMessagesUpdater(
-        ILogger<PinnedMessagesUpdater> logger,
+    public BackgroundChatProcessor(
+        ILogger<BackgroundChatProcessor> logger,
         ITelegramBotClient telegramBotClient,
         IDatabase database,
         IDataFormatter dataFormatter,
@@ -48,48 +48,7 @@ public class PinnedMessagesUpdater : BackgroundService
             // Until service shutdown.
             while (!cancellationToken.IsCancellationRequested)
             {
-                // Get sync event for chat.
-                var items = this.pinnedMessagesManager.GetChatEvents();
-
-                foreach (var item in items)
-                {
-                    // If item is marked as updated.
-                    if (item.mre.IsSet)
-                    {
-                        var (isSuccessfull, messageId, time) = await this.database.GetPinnedMessageAsync(
-                            item.chatId,
-                            MessageType.Status,
-                            cancellationToken);
-                        if (isSuccessfull)
-                        {
-                            try
-                            {
-                                var stats = await this.database.GetStatsAsync(
-                                    userId: 0,
-                                    chatId: item.chatId,
-                                    isPrivateChat: false,
-                                    cancellationToken);
-                                var msg = await this.dataFormatter.FormatStats(
-                                    stats,
-                                    cancellationToken);
-                                await this.UpdateAsync(
-                                    item.chatId,
-                                    msg,
-                                    MessageType.Status,
-                                    cancellationToken);
-                            }
-                            catch (Exception exc)
-                            {
-                                this.logger.LogError(exc, "Problem occur while updating pinned message.");
-                            }
-                            finally
-                            {
-                                item.mre.Reset();
-                            }
-                        }
-                    }
-                }
-
+                await this.UpdatePinnedStatuses(cancellationToken);
                 await Task.Delay(5000, cancellationToken);
             }
         }
@@ -103,6 +62,52 @@ public class PinnedMessagesUpdater : BackgroundService
         finally
         {
             this.logger.LogInformation($"Pinned messages service is stopping.");
+        }
+    }
+
+    private async Task UpdatePinnedStatuses(
+        CancellationToken cancellationToken)
+    {
+        // Get sync event for chat.
+        var items = this.pinnedMessagesManager.GetChatEvents();
+
+        foreach (var item in items)
+        {
+            // If item is marked as updated.
+            if (item.mre.IsSet)
+            {
+                var (isSuccessfull, messageId, time) = await this.database.GetPinnedMessageAsync(
+                    item.chatId,
+                    MessageType.Status,
+                    cancellationToken);
+                if (isSuccessfull)
+                {
+                    try
+                    {
+                        var stats = await this.database.GetStatsAsync(
+                            userId: 0,
+                            chatId: item.chatId,
+                            isPrivateChat: false,
+                            cancellationToken);
+                        var msg = await this.dataFormatter.FormatStats(
+                            stats,
+                            cancellationToken);
+                        await this.UpdateAsync(
+                            item.chatId,
+                            msg,
+                            MessageType.Status,
+                            cancellationToken);
+                    }
+                    catch (Exception exc)
+                    {
+                        this.logger.LogError(exc, "Problem occur while updating pinned message.");
+                    }
+                    finally
+                    {
+                        item.mre.Reset();
+                    }
+                }
+            }
         }
     }
 

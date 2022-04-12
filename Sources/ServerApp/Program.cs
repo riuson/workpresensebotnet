@@ -26,7 +26,7 @@ builder.Services.AddSingleton<IMessageHandler, MessageHandler>();
 builder.Services.AddSingleton<IDatabase, Database>();
 builder.Services.AddSingleton<IDataFormatter, DataFormatter>();
 
-builder.Services.AddHostedService<PinnedMessagesUpdater>();
+builder.Services.AddHostedService<BackgroundChatProcessor>();
 builder.Services.AddSingleton<IPinnedMessagesManager, PinnedMessagesManager>();
 
 var configuration = builder.Configuration;
