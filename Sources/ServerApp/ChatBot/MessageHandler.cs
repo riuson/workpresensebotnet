@@ -174,7 +174,7 @@ public class MessageHandler : IMessageHandler
                 await this.SendMessageAsync(
                     botClient,
                     receivedMessage,
-                    $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
+                    $"Hello!\nChat '{telegramChat.Title}' is registered. 👌",
                     ParseMode.Html,
                     false,
                     isPrivate,
