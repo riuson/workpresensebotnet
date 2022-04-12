@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ServerApp.ChatBot;
 using ServerApp.Database;
 using ServerApp.Entities;
 
@@ -13,18 +14,22 @@ public class SetStatusController : ControllerBase
 {
     private readonly ILogger<SetStatusController> logger;
     private readonly IDatabase database;
+    private readonly IPinnedMessagesManager pinnedMessagesManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SetStatusController"/> class.
     /// </summary>
     /// <param name="logger">Logger for <see cref="SetStatusController"/>.</param>
     /// <param name="database">Interface to access persistent data.</param>
+    /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
     public SetStatusController(
         ILogger<SetStatusController> logger,
-        IDatabase database)
+        IDatabase database,
+        IPinnedMessagesManager pinnedMessagesManager)
     {
         this.logger = logger;
         this.database = database;
+        this.pinnedMessagesManager = pinnedMessagesManager;
     }
 
     /// <summary>
@@ -64,7 +69,7 @@ public class SetStatusController : ControllerBase
             }
         }
 
-        var (isSuccessfull, previousStatus, time) = await this.database.UpdateUserStatusAsync(
+        var (isSuccessfull, chatId, previousStatus, time) = await this.database.UpdateUserStatusAsync(
             hookId,
             newStatus,
             CancellationToken.None);
@@ -74,11 +79,13 @@ public class SetStatusController : ControllerBase
             return this.NotFound("Failed! Specified Id is not exists.");
         }
 
+        this.pinnedMessagesManager.MarkChat(chatId);
+
         if (previousStatus != newStatus)
         {
-            return this.Ok($"Success! Status updated from {previousStatus} to {newStatus} at {time}:");
+            return this.Ok($"Success! Status updated from {previousStatus} to {newStatus} at {time}.");
         }
 
-        return this.Ok($"Success! Status updated to {newStatus} at {time}:");
+        return this.Ok($"Success! Status updated to {newStatus} at {time}.");
     }
 }

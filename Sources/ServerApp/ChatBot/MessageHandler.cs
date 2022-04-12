@@ -1,12 +1,11 @@
-﻿using System.Text;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using ServerApp.Database;
 using ServerApp.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 using BotChat = ServerApp.Entities.Chat;
+using MessageType = ServerApp.Entities.MessageType;
 
 namespace ServerApp.ChatBot;
 
@@ -17,26 +16,36 @@ public class MessageHandler : IMessageHandler
 {
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandler> logger;
-    private readonly IConfiguration configuration;
+    private readonly IPinnedMessagesManager pinnedMessagesManager;
+    private readonly IDataFormatter dataFormatter;
+    private readonly IDatabase database;
     private readonly Regex regCommand = new Regex(@"^/\w+$");
+    private readonly IScheduledMessageRemover scheduledMessageRemover;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageHandler"/> class.
     /// </summary>
     /// <param name="serviceProvider">Service provider.</param>
     /// <param name="logger">Logger service.</param>
-    /// <param name="configuration">Configuration data.</param>
+    /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
+    /// <param name="dataFormatter">Data formatter serv7ice.</param>
+    /// <param name="database">Database interface.</param>
+    /// <param name="scheduledMessageRemover">Scheduler for removing messages.</param>
     public MessageHandler(
         IServiceProvider serviceProvider,
         ILogger<MessageHandler> logger,
-        IConfiguration configuration)
+        IPinnedMessagesManager pinnedMessagesManager,
+        IDataFormatter dataFormatter,
+        IDatabase database,
+        IScheduledMessageRemover scheduledMessageRemover)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
-        this.configuration = configuration;
+        this.pinnedMessagesManager = pinnedMessagesManager;
+        this.dataFormatter = dataFormatter;
+        this.database = database;
+        this.scheduledMessageRemover = scheduledMessageRemover;
     }
-
-    private string WebHandlersUriBase => this.configuration.GetValue<string>("WebHook:Uri");
 
     /// <inheritdoc />
     public async Task ProcessTextMessage(
@@ -97,25 +106,48 @@ public class MessageHandler : IMessageHandler
                     _ => Status.Unknown,
                 };
 
-                using (var db = this.serviceProvider.GetService<IDatabase>())
+                var chats = await this.database.UpdateUserStatusAsync(
+                    receivedMessage.From!.Id,
+                    telegramChat.Id,
+                    isPrivate,
+                    receivedMessage.From?.Username ?? string.Empty,
+                    receivedMessage.From?.FirstName ?? string.Empty,
+                    receivedMessage.From?.LastName ?? string.Empty,
+                    newStatus,
+                    cancellationToken);
+
+                var answerMessage = await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    $"Status updated. 👌",
+                    ParseMode.Html,
+                    false,
+                    isPrivate,
+                    cancellationToken);
+
+                if (isPrivate)
                 {
-                    var affectedEntities = await db!.UpdateUserStatusAsync(
-                        receivedMessage.From!.Id,
+                    foreach (var chatId in chats)
+                    {
+                        var item = this.pinnedMessagesManager.GetChatEvent(chatId);
+                        item.Set();
+                    }
+                }
+                else
+                {
+                    var item = this.pinnedMessagesManager.GetChatEvent(telegramChat.Id);
+                    item.Set();
+
+                    await this.scheduledMessageRemover.RemoveAfterAsync(
                         telegramChat.Id,
-                        isPrivate,
-                        receivedMessage.From?.Username ?? string.Empty,
-                        receivedMessage.From?.FirstName ?? string.Empty,
-                        receivedMessage.From?.LastName ?? string.Empty,
-                        newStatus,
+                        receivedMessage.MessageId,
+                        TimeSpan.FromMinutes(5),
                         cancellationToken);
 
-                    await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        $"Updated entities: {affectedEntities} 👌",
-                        ParseMode.Html,
-                        false,
-                        isPrivate,
+                    await this.scheduledMessageRemover.RemoveAfterAsync(
+                        telegramChat.Id,
+                        answerMessage.MessageId,
+                        TimeSpan.FromMinutes(5),
                         cancellationToken);
                 }
 
@@ -129,27 +161,24 @@ public class MessageHandler : IMessageHandler
                     break;
                 }
 
-                using (var db = this.serviceProvider.GetService<IDatabase>())
-                {
-                    var affectedEntities = await db!.UpdateUserStatusAsync(
-                        receivedMessage.From!.Id,
-                        telegramChat.Id,
-                        isPrivate,
-                        receivedMessage.From?.Username ?? string.Empty,
-                        receivedMessage.From?.FirstName ?? string.Empty,
-                        receivedMessage.From?.LastName ?? string.Empty,
-                        Status.Unknown,
-                        cancellationToken);
+                var affectedEntities = await this.database.UpdateUserStatusAsync(
+                    receivedMessage.From!.Id,
+                    telegramChat.Id,
+                    isPrivate,
+                    receivedMessage.From?.Username ?? string.Empty,
+                    receivedMessage.From?.FirstName ?? string.Empty,
+                    receivedMessage.From?.LastName ?? string.Empty,
+                    Status.Unknown,
+                    cancellationToken);
 
-                    await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
-                        ParseMode.Html,
-                        false,
-                        isPrivate,
-                        cancellationToken);
-                }
+                await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    $"Hello!\nChat '{telegramChat.Title}' is registered. \nUpdated entities: {affectedEntities} 👌",
+                    ParseMode.Html,
+                    false,
+                    isPrivate,
+                    cancellationToken);
 
                 break;
             }
@@ -161,25 +190,36 @@ public class MessageHandler : IMessageHandler
 
             case "/stats":
             {
-                using (var db = this.serviceProvider.GetService<IDatabase>())
+                var chats = await this.database.GetStatsAsync(
+                    receivedMessage.From!.Id,
+                    telegramChat.Id,
+                    isPrivate,
+                    cancellationToken);
+                var msg = await this.dataFormatter.FormatStats(
+                    chats,
+                    cancellationToken);
+
+                var message = await this.SendMessageAsync(
+                    botClient,
+                    receivedMessage,
+                    msg,
+                    ParseMode.Html,
+                    false,
+                    isPrivate,
+                    cancellationToken);
+
+                if (!isPrivate)
                 {
-                    var stats = await db!.GetStatsAsync(
-                        receivedMessage.From!.Id,
+                    await this.pinnedMessagesManager.NewAsync(
                         telegramChat.Id,
-                        isPrivate,
-                        cancellationToken);
-                    var msg = await this.FormatStats(
-                        botClient,
-                        stats,
+                        message.MessageId,
+                        MessageType.Status,
                         cancellationToken);
 
-                    await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        msg,
-                        ParseMode.Html,
-                        false,
-                        isPrivate,
+                    await this.scheduledMessageRemover.RemoveAfterAsync(
+                        telegramChat.Id,
+                        receivedMessage.MessageId,
+                        TimeSpan.FromMinutes(5),
                         cancellationToken);
                 }
 
@@ -188,37 +228,33 @@ public class MessageHandler : IMessageHandler
 
             case "/web_handlers":
             {
-                using (var db = this.serviceProvider.GetService<IDatabase>())
+                var hooks = await this.database.GetHooksAsync(
+                    receivedMessage.From!.Id,
+                    cancellationToken);
+
+                if (hooks.Count == 0)
                 {
-                    var hooks = await db!.GetHooksAsync(
-                        receivedMessage.From!.Id,
-                        cancellationToken);
-
-                    if (hooks.Count == 0)
-                    {
-                        await this.SendMessageAsync(
-                            botClient,
-                            receivedMessage,
-                            "There are no registered chats for this user!",
-                            ParseMode.Html,
-                            false,
-                            true,
-                            cancellationToken);
-                        return;
-                    }
-
-                    var keyboardMarkup = await this.FormatHooksKeyboardMarkup(
+                    await this.SendMessageAsync(
                         botClient,
-                        hooks,
+                        receivedMessage,
+                        "There are no registered chats for this user!",
+                        ParseMode.Html,
+                        false,
+                        true,
                         cancellationToken);
-
-                    var sentMessage = await botClient.SendTextMessageAsync(
-                        receivedMessage.From?.Id ??
-                        throw new NullReferenceException("Received message from unknown sender!"),
-                        text: "Unique link for each chat and action are listed below 👇",
-                        replyMarkup: keyboardMarkup,
-                        cancellationToken: cancellationToken);
+                    return;
                 }
+
+                var keyboardMarkup = await this.dataFormatter.FormatHooksKeyboardMarkup(
+                    hooks,
+                    cancellationToken);
+
+                var sentMessage = await botClient.SendTextMessageAsync(
+                    receivedMessage.From?.Id ??
+                    throw new NullReferenceException("Received message from unknown sender!"),
+                    text: "Unique link for each chat and action are listed below 👇",
+                    replyMarkup: keyboardMarkup,
+                    cancellationToken: cancellationToken);
 
                 break;
             }
@@ -252,83 +288,5 @@ public class MessageHandler : IMessageHandler
                 replyToMessageId: asReply ? receivedMessage.MessageId : default,
                 cancellationToken: cancellationToken);
         return sentMessage;
-    }
-
-    private async Task<string> FormatStats(
-        ITelegramBotClient botClient,
-        Dictionary<long, IEnumerable<BotChat>> stats,
-        CancellationToken cancellationToken)
-    {
-        if (stats.Count == 0)
-        {
-            return "There are no registered chats for this user!";
-        }
-
-        var msg = new StringBuilder();
-
-        foreach (var pair in stats)
-        {
-            var chatInfo = await botClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
-
-            msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
-            msg.AppendLine("At work 🏢");
-            foreach (var chat in pair.Value.Where(x => x.Status.Status == Status.CameToWork))
-            {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User.Id,
-                    chat.User.NickName,
-                    chat.User.FirstName,
-                    chat.User.LastName);
-            }
-
-            msg.AppendLine("At home 🏠");
-            foreach (var chat in pair.Value.Where(x => x.Status.Status != Status.CameToWork))
-            {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chat.User.Id,
-                    chat.User.NickName,
-                    chat.User.FirstName,
-                    chat.User.LastName);
-            }
-        }
-
-        return msg.ToString();
-    }
-
-    private async Task<InlineKeyboardMarkup> FormatHooksKeyboardMarkup(
-        ITelegramBotClient botClient,
-        Dictionary<long, Guid> hooks,
-        CancellationToken cancellationToken)
-    {
-        List<IEnumerable<InlineKeyboardButton>> buttons = new ();
-
-        foreach (var pair in hooks)
-        {
-            var chatInfo = await botClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
-            buttons.Add(new[]
-            {
-                InlineKeyboardButton.WithUrl(
-                    "Chat: " + chatInfo!.Title!,
-                    chatInfo!.InviteLink!),
-            });
-            buttons.Add(new[]
-            {
-                InlineKeyboardButton.WithUrl(
-                    "Came to work",
-                    $"{this.WebHandlersUriBase}/{pair.Value}/came"),
-                InlineKeyboardButton.WithUrl(
-                    "Left work",
-                    $"{this.WebHandlersUriBase}/{pair.Value}/left"),
-                InlineKeyboardButton.WithUrl(
-                    "Stay at home",
-                    $"{this.WebHandlersUriBase}/{pair.Value}/stay"),
-            });
-        }
-
-        var inlineKeyboard = new InlineKeyboardMarkup(buttons);
-
-        return inlineKeyboard;
     }
 }

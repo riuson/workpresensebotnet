@@ -8,36 +8,19 @@ namespace ServerApp.Database;
 /// </summary>
 public class Database : IDatabase
 {
-    private readonly IServiceScope scope;
     private readonly ApplicationDbContext context;
-    private bool disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Database"/> class.
     /// </summary>
-    /// <param name="serviceProvider">Service provider.</param>
-    public Database(IServiceProvider serviceProvider)
+    /// <param name="context">Application's database context.</param>
+    public Database(ApplicationDbContext context)
     {
-        this.scope = serviceProvider?.CreateScope() ?? throw new ArgumentNullException(nameof(serviceProvider));
-        var context = this.scope.ServiceProvider.GetService<ApplicationDbContext>();
         this.context = context ?? throw new NullReferenceException("Resolved null DBContext!");
     }
 
     /// <inheritdoc />
-    public ApplicationDbContext Context => this.context;
-
-    /// <inheritdoc />
-    public void Dispose()
-    {
-        this.Dispose(true);
-
-        // Use SupressFinalize in case a subclass
-        // of this type implements a finalizer.
-        GC.SuppressFinalize(this);
-    }
-
-    /// <inheritdoc />
-    public async Task<int> UpdateUserStatusAsync(
+    public async Task<IEnumerable<long>> UpdateUserStatusAsync(
         long userId,
         long chatId,
         bool isPrivateChat,
@@ -51,6 +34,7 @@ public class Database : IDatabase
             .FirstOrDefaultAsync(
                 x => x.Id == userId,
                 cancellationToken: cancellationToken);
+        var result = new List<long>();
 
         if (user is null)
         {
@@ -65,51 +49,66 @@ public class Database : IDatabase
         }
         else
         {
-            await this.context.Entry(user).Collection(x => x.Chats).LoadAsync();
+            await this.context.Entry(user)
+                .Collection(x => x.Statuses)
+                .LoadAsync(cancellationToken);
         }
 
         if (isPrivateChat)
         {
-            // Update all registered chats for user.
-            foreach (var chat in user.Chats)
+            // Update all existing statuses for user.
+            foreach (var userStatus in user.Statuses)
             {
-                await this.context.Entry(chat).Reference(x => x.Status).LoadAsync();
-                chat.Status.Status = status;
-                chat.Status.Time = DateTime.Now;
+                userStatus.Status = status;
+                userStatus.Time = DateTime.Now;
+                result.Add(userStatus.ChatId);
             }
         }
         else
         {
-            // Update current chat.
-            var chat = user.Chats.FirstOrDefault(x => x.ChatId == chatId);
+            // Get chat record.
+            var chat = await this.context.Chats
+                .FirstOrDefaultAsync(x => x.Id == chatId, cancellationToken);
 
             if (chat is null)
             {
                 chat = new Chat()
                 {
-                    User = user,
-                    ChatId = chatId,
+                    Id = chatId,
                 };
-                chat.Status.Chat = chat;
-                chat.Status.HookId = Guid.NewGuid();
-                chat.Status.Status = status;
-                chat.Status.Time = DateTime.Now;
                 this.context.Chats.Add(chat);
+            }
+
+            // Update current chat/user status.
+            var chatStatus = user.Statuses.FirstOrDefault(x => x.ChatId == chatId && x.UserId == userId);
+
+            if (chatStatus is null)
+            {
+                chatStatus = new ChatStatus()
+                {
+                    User = user,
+                    Chat = chat,
+                    HookId = Guid.NewGuid(),
+                    Status = status,
+                    Time = DateTime.Now,
+                };
+                this.context.Statuses.Add(chatStatus);
             }
             else
             {
-                await this.context.Entry(chat).Reference(x => x.Status).LoadAsync();
-                chat.Status.Status = status;
-                chat.Status.Time = DateTime.Now;
+                chatStatus.Status = status;
+                chatStatus.Time = DateTime.Now;
             }
+
+            result.Add(chatId);
         }
 
-        var affectedEntities = await this.context.SaveChangesAsync(cancellationToken);
-        return affectedEntities;
+        await this.context.SaveChangesAsync(cancellationToken);
+        return result;
     }
 
     /// <inheritdoc />
-    public async Task<(bool isSuccessfull, Status previousStatus, DateTime time)> UpdateUserStatusAsync(
+    public async Task<(bool isSuccessfull, long chatId, Status previousStatus, DateTime time)> UpdateUserStatusAsync(
         Guid hookId,
         Status status,
         CancellationToken cancellationToken)
@@ -119,18 +118,18 @@ public class Database : IDatabase
 
         if (statusRecord is null)
         {
-            return (false, Status.Unknown, DateTime.Now);
+            return (false, default, default, default);
         }
 
         var previousStatus = statusRecord.Status;
         statusRecord.Status = status;
         statusRecord.Time = DateTime.Now;
         await this.context.SaveChangesAsync(cancellationToken);
-        return (true, previousStatus, statusRecord.Time);
+        return (true, statusRecord.ChatId, previousStatus, statusRecord.Time);
     }
 
     /// <inheritdoc />
-    public async Task<Dictionary<long, IEnumerable<Chat>>> GetStatsAsync(
+    public async Task<IEnumerable<Chat>> GetStatsAsync(
         long userId,
         long chatId,
         bool isPrivateChat,
@@ -141,34 +140,41 @@ public class Database : IDatabase
                 x => x.Id == userId,
                 cancellationToken: cancellationToken);
 
-        if (user is null)
+        var selectedChats = new List<Chat>();
+
+        if (isPrivateChat && user is not null)
         {
-            return new Dictionary<long, IEnumerable<Chat>>();
+            await this.context.Users
+                .Where(x => x.Id == userId)
+                .Include(x => x.Statuses)
+                .ThenInclude(x => x.Chat)
+                .LoadAsync(cancellationToken);
+
+            selectedChats.AddRange(
+                user.Statuses
+                    .Where(x => x.Chat is not null)
+                    .Select(x => x.Chat!)
+                    .Distinct());
+        }
+        else if (!isPrivateChat)
+        {
+            var chat = await this.context.Chats
+                .Where(x => x.Id == chatId)
+                .Include(x => x.Statuses)
+                .ThenInclude(x => x.User)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (chat is not null)
+            {
+                selectedChats.Add(chat);
+            }
+        }
+        else
+        {
+            return new Chat[] { };
         }
 
-        await this.context.Entry(user).Collection(x => x.Chats).LoadAsync();
-        var chats = isPrivateChat
-            ? user.Chats.ToArray()
-            : user.Chats.Where(x => x.ChatId == chatId).ToArray();
-
-        if (chats.Length == 0)
-        {
-            return new Dictionary<long, IEnumerable<Chat>>();
-        }
-
-        var result = new Dictionary<long, IEnumerable<Chat>>();
-
-        foreach (var chat in chats)
-        {
-            var sameChats = await this.context.Chats
-                .Where(x => x.ChatId == chat.ChatId)
-                .Include(x => x.User)
-                .Include(x => x.Status)
-                .ToArrayAsync(cancellationToken);
-            result.Add(chat.ChatId, sameChats);
-        }
-
-        return result;
+        return selectedChats;
     }
 
     /// <inheritdoc />
@@ -176,31 +182,76 @@ public class Database : IDatabase
         long userId,
         CancellationToken cancellationToken)
     {
-        var chats = await this.context.Chats
+        var chats = await this.context.Statuses
             .Where(x => x.UserId == userId)
-            .Include(x => x.Status)
+            .Include(x => x.Chat)
             .ToListAsync(cancellationToken);
-        return chats.ToDictionary(x => x.ChatId, x => x.Status.HookId);
+        return chats.ToDictionary(x => x.ChatId, x => x.HookId);
     }
 
-    /// <summary>
-    /// Internal dispose method.
-    /// </summary>
-    /// <param name="disposing">Flag of completed disposing.</param>
-    protected virtual void Dispose(bool disposing)
+    /// <inheritdoc />
+    public async Task<(bool isSuccessfull, long messageId, DateTime time)> GetPinnedMessageAsync(
+        long chatId,
+        MessageType messageType,
+        CancellationToken cancellationToken)
     {
-        if (!this.disposed)
-        {
-            if (disposing)
-            {
-                // Clear all property values that maybe have been set
-                // when the class was instantiated
-                this.context.Dispose();
-                this.scope.Dispose();
-            }
+        var result = await this.context.PinnedMessages
+            .FirstOrDefaultAsync(
+                x => x.ChatId == chatId && x.MessageType == messageType,
+                cancellationToken);
 
-            // Indicate that the instance has been disposed.
-            this.disposed = true;
+        if (result is null)
+        {
+            return (false, default, default);
         }
+
+        return (true, result.MessageId, result.Time);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdatePinnedMessageAsync(
+        long chatId,
+        int messageId,
+        MessageType messageType,
+        DateTime time,
+        CancellationToken cancellationToken)
+    {
+        var chat = await this.context.Chats
+            .FirstOrDefaultAsync(
+                x => x.Id == chatId,
+                cancellationToken);
+
+        if (chat is null)
+        {
+            chat = new Chat()
+            {
+                Id = chatId,
+            };
+            this.context.Chats.Add(chat);
+        }
+
+        var pinnedMessage = await this.context.PinnedMessages
+            .FirstOrDefaultAsync(
+                x => x.ChatId == chatId && x.MessageType == messageType,
+                cancellationToken);
+
+        if (pinnedMessage is null)
+        {
+            pinnedMessage = new PinnedMessage()
+            {
+                Chat = chat,
+                MessageId = messageId,
+                Time = time,
+                MessageType = messageType,
+            };
+            this.context.PinnedMessages.Add(pinnedMessage);
+        }
+        else
+        {
+            pinnedMessage.Time = time;
+            pinnedMessage.MessageId = messageId;
+        }
+
+        await this.context.SaveChangesAsync(cancellationToken);
     }
 }

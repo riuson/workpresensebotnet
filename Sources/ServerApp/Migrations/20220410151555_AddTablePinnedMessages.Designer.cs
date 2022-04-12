@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ServerApp.Database;
 
@@ -10,9 +11,11 @@ using ServerApp.Database;
 namespace ServerApp.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20220410151555_AddTablePinnedMessages")]
+    partial class AddTablePinnedMessages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "6.0.3");
@@ -88,7 +91,7 @@ namespace ServerApp.Migrations
                     b.ToTable("phones", (string)null);
                 });
 
-            modelBuilder.Entity("ServerApp.Entities.PinnedMessage", b =>
+            modelBuilder.Entity("ServerApp.Entities.PinnedStatusMessage", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -103,10 +106,6 @@ namespace ServerApp.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("message_id");
 
-                    b.Property<int>("MessageType")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("message_type");
-
                     b.Property<DateTime>("Time")
                         .HasColumnType("TEXT")
                         .HasColumnName("time");
@@ -115,7 +114,7 @@ namespace ServerApp.Migrations
 
                     b.HasIndex("ChatId");
 
-                    b.ToTable("pinned_messages", (string)null);
+                    b.ToTable("pinned_statuses", (string)null);
                 });
 
             modelBuilder.Entity("ServerApp.Entities.User", b =>
@@ -172,7 +171,7 @@ namespace ServerApp.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ServerApp.Entities.PinnedMessage", b =>
+            modelBuilder.Entity("ServerApp.Entities.PinnedStatusMessage", b =>
                 {
                     b.HasOne("ServerApp.Entities.Chat", "Chat")
                         .WithMany("PinnedStatusMessages")

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ServerApp.ChatBot;
 using ServerApp.Database;
+using Telegram.Bot;
 
 var builder = WebApplication.CreateBuilder(Environment.GetCommandLineArgs());
 
@@ -21,12 +22,21 @@ builder.Configuration.AddJsonFile(
     reloadOnChange: true);
 
 builder.Services.AddHostedService<TeleBotService>();
-builder.Services.AddTransient<IMessageHandler, MessageHandler>();
-builder.Services.AddTransient<IDatabase, Database>();
+builder.Services.AddSingleton<IMessageHandler, MessageHandler>();
+builder.Services.AddSingleton<IDatabase, Database>();
+builder.Services.AddSingleton<IDataFormatter, DataFormatter>();
+builder.Services.AddSingleton<IScheduledMessageRemover, ScheduledMessageRemover>();
+builder.Services.AddHostedService<BackgroundChatProcessor>();
+builder.Services.AddSingleton<IPinnedMessagesManager, PinnedMessagesManager>();
 
 var configuration = builder.Configuration;
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+builder.Services.AddDbContext<ApplicationDbContext>(
+    contextLifetime: ServiceLifetime.Singleton,
+    optionsAction: options =>
+        options.UseSqlite(configuration.GetConnectionString("DataFile2")));
+
+builder.Services.AddSingleton<ITelegramBotClient, TelegramBotClient>(_ =>
+    new TelegramBotClient(configuration.GetValue<string>("TelegramBotToken")));
 
 var port = configuration.GetValue<int>("WebHook:Port");
 builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(port));
