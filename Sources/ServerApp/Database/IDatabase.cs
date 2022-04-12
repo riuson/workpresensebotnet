@@ -39,7 +39,7 @@ namespace ServerApp.Database
         /// <param name="status">New status of the user.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Status of operation.</returns>
-        Task<(bool isSuccessfull, Status previousStatus, DateTime time)> UpdateUserStatusAsync(
+        Task<(bool isSuccessfull, long chatId, Status previousStatus, DateTime time)> UpdateUserStatusAsync(
             Guid hookId,
             Status status,
             CancellationToken cancellationToken);
