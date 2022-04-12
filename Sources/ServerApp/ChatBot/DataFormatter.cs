@@ -44,9 +44,9 @@ public class DataFormatter : IDataFormatter
 
         foreach (var chat in chats)
         {
-            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chat.Id), cancellationToken);
+            var chatTitle = await this.GetChatTitle(chat, cancellationToken);
 
-            msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
+            msg.AppendFormat("*** <b>{0}</b> ***\n", chatTitle);
             msg.AppendLine("At work 🏢");
             foreach (var chatStatus in chat.Statuses.Where(x => x.Status == Status.CameToWork))
             {
@@ -68,6 +68,8 @@ public class DataFormatter : IDataFormatter
                     chatStatus.User.FirstName,
                     chatStatus.User.LastName);
             }
+
+            msg.AppendLine();
         }
 
         return msg.ToString();
@@ -106,5 +108,18 @@ public class DataFormatter : IDataFormatter
         var inlineKeyboard = new InlineKeyboardMarkup(buttons);
 
         return inlineKeyboard;
+    }
+
+    private async Task<string> GetChatTitle(BotChat chat, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chat.Id), cancellationToken);
+            return chatInfo.Title ?? "null";
+        }
+        catch
+        {
+            return "not found";
+        }
     }
 }
