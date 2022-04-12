@@ -24,7 +24,7 @@ namespace ServerApp.Database
             this.Chats = this.Set<Chat>();
             this.Statuses = this.Set<ChatStatus>();
             this.PinnedMessages = this.Set<PinnedMessage>();
-            ////this.Database.EnsureCreated();
+            this.Database.EnsureCreated();
         }
 
         /// <summary>

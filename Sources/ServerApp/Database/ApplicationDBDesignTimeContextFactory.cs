@@ -20,7 +20,7 @@ namespace ServerApp.Database
             builder.AddJsonFile("appsettings.Development.json");
             var config = builder.Build();
 
-            var connectionString = config.GetConnectionString("DataFile2");
+            var connectionString = config.GetConnectionString("Database");
             Debug.WriteLine($"ConnStr: {connectionString}");
             optionsBuilder.UseSqlite(connectionString);
             return new ApplicationDbContext(optionsBuilder.Options);
