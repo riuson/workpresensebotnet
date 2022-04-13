@@ -278,17 +278,56 @@ public class MessageHandler : IMessageHandler
         bool asPrivate,
         CancellationToken cancellationToken)
     {
+        var parts = this.SplitMessage(content);
         var chatId = receivedMessage.Chat.Id;
-        var sentMessage =
-            await botClient.SendTextMessageAsync(
-                asPrivate
-                    ? receivedMessage.From?.Id ??
-                      throw new NullReferenceException("Received message from unknown sender!")
-                    : chatId,
-                text: content,
-                parseMode: parseMode,
-                replyToMessageId: asReply ? receivedMessage.MessageId : default,
-                cancellationToken: cancellationToken);
-        return sentMessage;
+        Message? first = null;
+
+        foreach (var part in parts)
+        {
+            var sentMessage =
+                await botClient.SendTextMessageAsync(
+                    asPrivate
+                        ? receivedMessage.From?.Id ??
+                          throw new NullReferenceException("Received message from unknown sender!")
+                        : chatId,
+                    text: part,
+                    parseMode: parseMode,
+                    replyToMessageId: asReply ? receivedMessage.MessageId : default,
+                    cancellationToken: cancellationToken);
+
+            if (first is null)
+            {
+                first = sentMessage;
+            }
+        }
+
+        return first!;
+    }
+
+    private IEnumerable<string> SplitMessage(string value)
+    {
+        var items = value.Split("\n");
+        var result = new List<string>();
+        var temp = string.Empty;
+
+        foreach (var item in items)
+        {
+            if ((temp + "\n" + item).Length < 4000)
+            {
+                temp += "\n" + item;
+            }
+            else
+            {
+                result.Add(temp);
+                temp = item;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(temp))
+        {
+            result.Add(temp);
+        }
+
+        return result;
     }
 }
