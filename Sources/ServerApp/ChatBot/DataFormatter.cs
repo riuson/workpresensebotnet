@@ -48,7 +48,9 @@ public class DataFormatter : IDataFormatter
 
             msg.AppendFormat("*** <b>{0}</b> ***\n", chatTitle);
             msg.AppendLine("At work 🏢");
-            foreach (var chatStatus in chat.Statuses.Where(x => x.Status == Status.CameToWork))
+            foreach (var chatStatus in chat.Statuses
+                         .Where(x => x.Status == Status.CameToWork)
+                         .OrderByDescending(x => x.Time))
             {
                 var id = chatStatus.UserId;
                 var name = chatStatus.User?.NickName ?? "unknown";
@@ -64,7 +66,9 @@ public class DataFormatter : IDataFormatter
             }
 
             msg.AppendLine("At home 🏠");
-            foreach (var chatStatus in chat.Statuses.Where(x => x.Status != Status.CameToWork))
+            foreach (var chatStatus in chat.Statuses
+                         .Where(x => x.Status != Status.CameToWork)
+                         .OrderByDescending(x => x.Time))
             {
                 var id = chatStatus.UserId;
                 var name = chatStatus.User?.NickName ?? "unknown";
