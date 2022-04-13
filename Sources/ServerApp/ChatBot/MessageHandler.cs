@@ -92,6 +92,8 @@ public class MessageHandler : IMessageHandler
         var telegramChat = receivedMessage.Chat;
         var isPrivate = telegramChat.Type == ChatType.Private;
 
+        this.logger.LogInformation($"Received command {commandText} from user {userId} in chat {telegramChat.Id}.");
+
         switch (commandText)
         {
             case "/came":
