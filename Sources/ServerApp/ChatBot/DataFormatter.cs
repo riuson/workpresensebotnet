@@ -52,6 +52,7 @@ public class DataFormatter : IDataFormatter
             {
                 var id = chatStatus.UserId;
                 var name = chatStatus.User?.NickName ?? "unknown";
+                var time = this.FormatTime(chatStatus.Time);
 
                 if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
                     !string.IsNullOrEmpty(chatStatus.User?.LastName))
@@ -59,7 +60,7 @@ public class DataFormatter : IDataFormatter
                     name = $"{chatStatus.User.FirstName} {chatStatus.User.LastName}".Trim();
                 }
 
-                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a>");
+                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a> <i>{time}</i>");
             }
 
             msg.AppendLine("At home 🏠");
@@ -67,6 +68,7 @@ public class DataFormatter : IDataFormatter
             {
                 var id = chatStatus.UserId;
                 var name = chatStatus.User?.NickName ?? "unknown";
+                var time = this.FormatTime(chatStatus.Time);
 
                 if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
                     !string.IsNullOrEmpty(chatStatus.User?.LastName))
@@ -74,7 +76,7 @@ public class DataFormatter : IDataFormatter
                     name = $"{chatStatus.User.FirstName} {chatStatus.User.LastName}".Trim();
                 }
 
-                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a>");
+                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a> <i>{time}</i>");
             }
 
             msg.AppendLine();
@@ -129,5 +131,15 @@ public class DataFormatter : IDataFormatter
         {
             return "not found";
         }
+    }
+
+    private string FormatTime(DateTime value)
+    {
+        if (value.Date == DateTime.Now.Date)
+        {
+            return $"{value:HH:mm:ss}";
+        }
+
+        return $"{value:HH:mm:ss dd MMM}";
     }
 }
