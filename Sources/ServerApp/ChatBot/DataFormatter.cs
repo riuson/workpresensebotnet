@@ -40,7 +40,8 @@ public class DataFormatter : IDataFormatter
             return "There are no registered chats for this user!";
         }
 
-        var msg = new StringBuilder($"<i>Data as of {DateTime.Now:yyyy-MM-dd HH:mm:ss}</i>\n\n");
+        var now = this.UniversalToLocal(DateTime.Now);
+        var msg = new StringBuilder($"<i>Data as of {now:yyyy-MM-dd HH:mm:ss}</i>\n\n");
 
         foreach (var chat in chats)
         {
@@ -54,7 +55,7 @@ public class DataFormatter : IDataFormatter
             {
                 var id = chatStatus.UserId;
                 var name = chatStatus.User?.NickName ?? "unknown";
-                var time = this.FormatTime(chatStatus.Time);
+                var time = this.FormatTime(this.UniversalToLocal(chatStatus.Time));
 
                 if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
                     !string.IsNullOrEmpty(chatStatus.User?.LastName))
@@ -72,7 +73,7 @@ public class DataFormatter : IDataFormatter
             {
                 var id = chatStatus.UserId;
                 var name = chatStatus.User?.NickName ?? "unknown";
-                var time = this.FormatTime(chatStatus.Time);
+                var time = this.FormatTime(this.UniversalToLocal(chatStatus.Time));
 
                 if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
                     !string.IsNullOrEmpty(chatStatus.User?.LastName))
@@ -145,5 +146,11 @@ public class DataFormatter : IDataFormatter
         }
 
         return $"{value:HH:mm:ss dd MMM}";
+    }
+
+    private DateTime UniversalToLocal(DateTime value)
+    {
+        var localTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yekaterinburg");
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(value, DateTimeKind.Utc), localTimeZone);
     }
 }
