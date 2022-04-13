@@ -50,23 +50,31 @@ public class DataFormatter : IDataFormatter
             msg.AppendLine("At work 🏢");
             foreach (var chatStatus in chat.Statuses.Where(x => x.Status == Status.CameToWork))
             {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chatStatus.User!.Id,
-                    chatStatus.User.NickName,
-                    chatStatus.User.FirstName,
-                    chatStatus.User.LastName);
+                var id = chatStatus.UserId;
+                var name = chatStatus.User?.NickName ?? "unknown";
+
+                if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
+                    !string.IsNullOrEmpty(chatStatus.User?.LastName))
+                {
+                    name = $"{chatStatus.User.FirstName} {chatStatus.User.LastName}".Trim();
+                }
+
+                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a>");
             }
 
             msg.AppendLine("At home 🏠");
             foreach (var chatStatus in chat.Statuses.Where(x => x.Status != Status.CameToWork))
             {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chatStatus.User!.Id,
-                    chatStatus.User.NickName,
-                    chatStatus.User.FirstName,
-                    chatStatus.User.LastName);
+                var id = chatStatus.UserId;
+                var name = chatStatus.User?.NickName ?? "unknown";
+
+                if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
+                    !string.IsNullOrEmpty(chatStatus.User?.LastName))
+                {
+                    name = $"{chatStatus.User.FirstName} {chatStatus.User.LastName}".Trim();
+                }
+
+                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a>");
             }
 
             msg.AppendLine();
