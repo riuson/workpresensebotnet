@@ -19,7 +19,7 @@ public class MessageHandler : IMessageHandler
     private readonly IPinnedMessagesManager pinnedMessagesManager;
     private readonly IDataFormatter dataFormatter;
     private readonly IDatabase database;
-    private readonly Regex regCommand = new Regex(@"^/\w+$");
+    private readonly Regex regCommand = new Regex(@"^(?<cmd>/\w{1,30})");
     private readonly IScheduledMessageRemover scheduledMessageRemover;
 
     /// <summary>
@@ -61,12 +61,19 @@ public class MessageHandler : IMessageHandler
         {
             try
             {
+                var match = this.regCommand.Match(messageText);
+                var commandText = match.Groups["cmd"].Value;
+                var commandArgs = messageText
+                    .Remove(0, commandText.Length)
+                    .Trim();
+
                 this.logger.LogInformation(
-                    $"Received a command '{messageText}' in chat {chatId} from user {receivedMessage.From?.Id}.");
+                    $"Received a command '{commandText}' in chat {chatId} from user {receivedMessage.From?.Id}.");
                 await this.ExecuteCommandAsync(
                     botClient,
                     receivedMessage,
-                    messageText,
+                    commandText,
+                    commandArgs,
                     cancellationToken);
             }
             catch (Exception exc)
@@ -80,6 +87,7 @@ public class MessageHandler : IMessageHandler
         ITelegramBotClient botClient,
         Message receivedMessage,
         string commandText,
+        string commandArgs,
         CancellationToken cancellationToken)
     {
         var userId = receivedMessage.From?.Id ?? -1L;
