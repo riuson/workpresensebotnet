@@ -155,6 +155,20 @@ public class Database : IDatabase
                     .Where(x => x.Chat is not null)
                     .Select(x => x.Chat!)
                     .Distinct());
+
+            foreach (var selectedChat in selectedChats)
+            {
+                await this.context.Entry(selectedChat)
+                    .Collection(x => x.Statuses)
+                    .LoadAsync(cancellationToken);
+
+                foreach (var selectedChatStatus in selectedChat.Statuses)
+                {
+                    await this.context.Entry(selectedChatStatus)
+                        .Reference(x => x.User)
+                        .LoadAsync(cancellationToken);
+                }
+            }
         }
         else if (!isPrivateChat)
         {

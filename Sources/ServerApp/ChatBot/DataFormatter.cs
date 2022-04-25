@@ -40,34 +40,51 @@ public class DataFormatter : IDataFormatter
             return "There are no registered chats for this user!";
         }
 
-        var msg = new StringBuilder($"<i>Data as of {DateTime.Now:yyyy-MM-dd HH:mm:ss}</i>\n\n");
+        var now = this.UniversalToLocal(DateTime.Now);
+        var msg = new StringBuilder($"<i>Data as of {now:yyyy-MM-dd HH:mm:ss}</i>\n\n");
 
         foreach (var chat in chats)
         {
-            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chat.Id), cancellationToken);
+            var chatTitle = await this.GetChatTitle(chat, cancellationToken);
 
-            msg.AppendFormat("Chat: <b>{0}</b>\n", chatInfo.Title);
+            msg.AppendFormat("*** <b>{0}</b> ***\n", chatTitle);
             msg.AppendLine("At work 🏢");
-            foreach (var chatStatus in chat.Statuses.Where(x => x.Status == Status.CameToWork))
+            foreach (var chatStatus in chat.Statuses
+                         .Where(x => x.Status == Status.CameToWork)
+                         .OrderByDescending(x => x.Time))
             {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chatStatus.User!.Id,
-                    chatStatus.User.NickName,
-                    chatStatus.User.FirstName,
-                    chatStatus.User.LastName);
+                var id = chatStatus.UserId;
+                var name = chatStatus.User?.NickName ?? "unknown";
+                var time = this.FormatTime(this.UniversalToLocal(chatStatus.Time));
+
+                if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
+                    !string.IsNullOrEmpty(chatStatus.User?.LastName))
+                {
+                    name = $"{chatStatus.User.FirstName} {chatStatus.User.LastName}".Trim();
+                }
+
+                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a> <i>{time}</i>");
             }
 
             msg.AppendLine("At home 🏠");
-            foreach (var chatStatus in chat.Statuses.Where(x => x.Status != Status.CameToWork))
+            foreach (var chatStatus in chat.Statuses
+                         .Where(x => x.Status != Status.CameToWork)
+                         .OrderByDescending(x => x.Time))
             {
-                msg.AppendFormat(
-                    "• <a href=\"tg://user?id={0}\">@{1} {2} {3}</a>\n",
-                    chatStatus.User!.Id,
-                    chatStatus.User.NickName,
-                    chatStatus.User.FirstName,
-                    chatStatus.User.LastName);
+                var id = chatStatus.UserId;
+                var name = chatStatus.User?.NickName ?? "unknown";
+                var time = this.FormatTime(this.UniversalToLocal(chatStatus.Time));
+
+                if (!string.IsNullOrEmpty(chatStatus.User?.FirstName) ||
+                    !string.IsNullOrEmpty(chatStatus.User?.LastName))
+                {
+                    name = $"{chatStatus.User.FirstName} {chatStatus.User.LastName}".Trim();
+                }
+
+                msg.AppendLine($"• <a href=\"tg://user?id={id}\">@{name}</a> <i>{time}</i>");
             }
+
+            msg.AppendLine();
         }
 
         return msg.ToString();
@@ -106,5 +123,34 @@ public class DataFormatter : IDataFormatter
         var inlineKeyboard = new InlineKeyboardMarkup(buttons);
 
         return inlineKeyboard;
+    }
+
+    private async Task<string> GetChatTitle(BotChat chat, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chat.Id), cancellationToken);
+            return chatInfo.Title ?? "null";
+        }
+        catch
+        {
+            return "not found";
+        }
+    }
+
+    private string FormatTime(DateTime value)
+    {
+        if (value.Date == DateTime.Now.Date)
+        {
+            return $"{value:HH:mm:ss}";
+        }
+
+        return $"{value:HH:mm:ss dd MMM}";
+    }
+
+    private DateTime UniversalToLocal(DateTime value)
+    {
+        var localTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yekaterinburg");
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(value, DateTimeKind.Utc), localTimeZone);
     }
 }
