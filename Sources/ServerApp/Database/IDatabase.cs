@@ -98,5 +98,18 @@ namespace ServerApp.Database
             MessageType messageType,
             DateTime time,
             CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Updates user name (first, last or nickname).
+        /// </summary>
+        /// <param name="userId">User Id (Telegram).</param>
+        /// <param name="callback">Callback that received current values and returns new values.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task that represents the asynchronous operation.</returns>
+        public Task UpdateUserInfoAsync(
+            long userId,
+            Func<(string firstName, string lastName, string nickName), (string firstName, string lastName, string
+                nickName)> callback,
+            CancellationToken cancellationToken);
     }
 }

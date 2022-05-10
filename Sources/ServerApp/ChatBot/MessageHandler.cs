@@ -53,6 +53,9 @@ public class MessageHandler : IMessageHandler
         this.commandHandlers.Add("start", this.CommandStart);
         this.commandHandlers.Add("stats", this.CommandStats);
         this.commandHandlers.Add("web_handlers", this.CommandWebHandlers);
+        this.commandHandlers.Add("set_first_name", this.CommandSetName);
+        this.commandHandlers.Add("set_last_name", this.CommandSetName);
+        this.commandHandlers.Add("set_user_name", this.CommandSetName);
     }
 
     private delegate Task CommandHandler(CommandHandlerData data);
@@ -257,6 +260,52 @@ public class MessageHandler : IMessageHandler
             data.User.Id,
             text: "Unique link for each chat and action are listed below 👇",
             replyMarkup: keyboardMarkup,
+            cancellationToken: data.CancellationToken);
+    }
+
+    private async Task CommandSetName(CommandHandlerData data)
+    {
+        await this.database.UpdateUserInfoAsync(
+            data.User.Id,
+            oldValues =>
+            {
+                var firstName = oldValues.firstName;
+                var lastName = oldValues.lastName;
+                var nickName = oldValues.nickName;
+
+                switch (data.CommandName)
+                {
+                    case "set_first_name":
+                    {
+                        firstName = data.CommandArgs;
+                        break;
+                    }
+
+                    case "set_last_name":
+                    {
+                        lastName = data.CommandArgs;
+                        break;
+                    }
+
+                    case "set_user_name":
+                    {
+                        nickName = data.CommandArgs;
+                        break;
+                    }
+
+                    default:
+                    {
+                        break;
+                    }
+                }
+
+                return (firstName, lastName, nickName);
+            },
+            data.CancellationToken);
+
+        var sentMessage = await data.BotClient.SendTextMessageAsync(
+            data.User.Id,
+            text: "Information was updated.",
             cancellationToken: data.CancellationToken);
     }
 
