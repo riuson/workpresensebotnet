@@ -45,9 +45,9 @@ public class DataFormatter : IDataFormatter
 
         foreach (var chat in chats)
         {
-            var chatTitle = await this.GetChatTitle(chat, cancellationToken);
+            var chatInfo = await this.GetChatTitleAsync(chat.Id, cancellationToken);
 
-            msg.AppendFormat("*** <b>{0}</b> ***\n", chatTitle);
+            msg.AppendFormat("*** <b>{0}</b> ***\n", chatInfo.title);
             msg.AppendLine("At work 🏢");
             foreach (var chatStatus in chat.Statuses
                          .Where(x => x.Status == Status.CameToWork)
@@ -99,13 +99,15 @@ public class DataFormatter : IDataFormatter
 
         foreach (var pair in hooks)
         {
-            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(pair.Key), cancellationToken);
+            var chatInfo = await this.GetChatTitleAsync(pair.Key, cancellationToken);
+
             buttons.Add(new[]
             {
                 InlineKeyboardButton.WithUrl(
-                    "Chat: " + chatInfo!.Title!,
-                    chatInfo!.InviteLink!),
+                    "Chat: " + chatInfo.title,
+                    chatInfo.inviteLink),
             });
+
             buttons.Add(new[]
             {
                 InlineKeyboardButton.WithUrl(
@@ -125,16 +127,18 @@ public class DataFormatter : IDataFormatter
         return inlineKeyboard;
     }
 
-    private async Task<string> GetChatTitle(BotChat chat, CancellationToken cancellationToken)
+    private async Task<(string title, string inviteLink)> GetChatTitleAsync(
+        long chatId,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chat.Id), cancellationToken);
-            return chatInfo.Title ?? "null";
+            var chatInfo = await this.telegramBotClient.GetChatAsync(new ChatId(chatId), cancellationToken);
+            return (chatInfo.Title ?? chatId.ToString(), chatInfo.InviteLink ?? "http://127.0.0.1");
         }
         catch
         {
-            return "not found";
+            return ($"not found ({chatId})", "http://127.0.0.1");
         }
     }
 

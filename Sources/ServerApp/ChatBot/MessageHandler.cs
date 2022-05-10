@@ -19,8 +19,9 @@ public class MessageHandler : IMessageHandler
     private readonly IPinnedMessagesManager pinnedMessagesManager;
     private readonly IDataFormatter dataFormatter;
     private readonly IDatabase database;
-    private readonly Regex regCommand = new Regex(@"^/\w+$");
+    private readonly Regex regCommand = new Regex(@"^/(?<cmd>\w{1,30})");
     private readonly IScheduledMessageRemover scheduledMessageRemover;
+    private readonly Dictionary<string, CommandHandler> commandHandlers = new ();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageHandler"/> class.
@@ -28,7 +29,7 @@ public class MessageHandler : IMessageHandler
     /// <param name="serviceProvider">Service provider.</param>
     /// <param name="logger">Logger service.</param>
     /// <param name="pinnedMessagesManager">Pinned messages manager.</param>
-    /// <param name="dataFormatter">Data formatter serv7ice.</param>
+    /// <param name="dataFormatter">Data formatter service.</param>
     /// <param name="database">Database interface.</param>
     /// <param name="scheduledMessageRemover">Scheduler for removing messages.</param>
     public MessageHandler(
@@ -45,7 +46,19 @@ public class MessageHandler : IMessageHandler
         this.dataFormatter = dataFormatter;
         this.database = database;
         this.scheduledMessageRemover = scheduledMessageRemover;
+
+        this.commandHandlers.Add("came", this.CommandSetStatus);
+        this.commandHandlers.Add("left", this.CommandSetStatus);
+        this.commandHandlers.Add("stay", this.CommandSetStatus);
+        this.commandHandlers.Add("start", this.CommandStart);
+        this.commandHandlers.Add("stats", this.CommandStats);
+        this.commandHandlers.Add("web_handlers", this.CommandWebHandlers);
+        this.commandHandlers.Add("set_first_name", this.CommandSetName);
+        this.commandHandlers.Add("set_last_name", this.CommandSetName);
+        this.commandHandlers.Add("set_user_name", this.CommandSetName);
     }
+
+    private delegate Task CommandHandler(CommandHandlerData data);
 
     /// <inheritdoc />
     public async Task ProcessTextMessage(
@@ -53,7 +66,6 @@ public class MessageHandler : IMessageHandler
         Message receivedMessage,
         CancellationToken cancellationToken)
     {
-        var chatId = receivedMessage.Chat.Id;
         var messageText = receivedMessage.Text ?? string.Empty;
 
         // Process only commands.
@@ -61,13 +73,24 @@ public class MessageHandler : IMessageHandler
         {
             try
             {
-                this.logger.LogInformation(
-                    $"Received a command '{messageText}' in chat {chatId} from user {receivedMessage.From?.Id}.");
-                await this.ExecuteCommandAsync(
+                var match = this.regCommand.Match(messageText);
+                var commandText = match.Groups["cmd"].Value;
+                var commandArgs = messageText
+                    .Remove(0, commandText.Length + 1)
+                    .Trim();
+
+                if (receivedMessage.From?.Id is null)
+                {
+                    return;
+                }
+
+                var data = new CommandHandlerData(
                     botClient,
                     receivedMessage,
-                    messageText,
+                    commandText,
+                    commandArgs,
                     cancellationToken);
+                await this.ExecuteCommandAsync(data);
             }
             catch (Exception exc)
             {
@@ -76,210 +99,226 @@ public class MessageHandler : IMessageHandler
         }
     }
 
-    private async Task ExecuteCommandAsync(
-        ITelegramBotClient botClient,
-        Message receivedMessage,
-        string commandText,
-        CancellationToken cancellationToken)
+    private async Task ExecuteCommandAsync(CommandHandlerData data)
     {
-        var userId = receivedMessage.From?.Id ?? -1L;
+        if (this.commandHandlers.TryGetValue(data.CommandName, out var handler))
+        {
+            this.logger.LogInformation(
+                $"Received command {data.CommandName} from user {data.User.Id} in chat {data.Chat.Id}.");
+            var t = handler.Invoke(data);
+            await t;
+        }
+        else
+        {
+            this.logger.LogWarning($"An unknown command '{data.CommandName}' was received!");
+        }
+    }
 
-        if (userId < 0)
+    private async Task CommandSetStatus(CommandHandlerData data)
+    {
+        var newStatus = data.CommandName switch
+        {
+            "/came" => Status.CameToWork,
+            "/left" => Status.LeftWork,
+            "/stay" => Status.StayAtHome,
+            _ => Status.Unknown,
+        };
+
+        var chats = await this.database.UpdateUserStatusAsync(
+            data.User.Id,
+            data.Chat.Id,
+            data.IsPrivate,
+            data.User.Username ?? string.Empty,
+            data.User.FirstName ?? string.Empty,
+            data.User.LastName ?? string.Empty,
+            newStatus,
+            data.CancellationToken);
+
+        var answerMessage = await this.SendMessageAsync(
+            data.BotClient,
+            data.Chat,
+            data.User,
+            "Status updated. 👌",
+            ParseMode.Html,
+            data.IsPrivate,
+            data.CancellationToken);
+
+        if (data.IsPrivate)
+        {
+            foreach (var chatId in chats)
+            {
+                var item = this.pinnedMessagesManager.GetChatEvent(chatId);
+                item.Set();
+            }
+        }
+        else
+        {
+            var item = this.pinnedMessagesManager.GetChatEvent(data.Chat.Id);
+            item.Set();
+
+            await this.scheduledMessageRemover.RemoveAfterAsync(
+                data.Chat.Id,
+                data.Message.MessageId,
+                TimeSpan.FromMinutes(5),
+                data.CancellationToken);
+
+            await this.scheduledMessageRemover.RemoveAfterAsync(
+                data.Chat.Id,
+                answerMessage.MessageId,
+                TimeSpan.FromMinutes(5),
+                data.CancellationToken);
+        }
+    }
+
+    private async Task CommandStart(CommandHandlerData data)
+    {
+        if (data.IsPrivate)
         {
             return;
         }
 
-        var telegramChat = receivedMessage.Chat;
-        var isPrivate = telegramChat.Type == ChatType.Private;
+        var affectedEntities = await this.database.UpdateUserStatusAsync(
+            data.User.Id,
+            data.Chat.Id,
+            data.IsPrivate,
+            data.User.Username ?? string.Empty,
+            data.User.FirstName ?? string.Empty,
+            data.User.LastName ?? string.Empty,
+            Status.Unknown,
+            data.CancellationToken);
 
-        this.logger.LogInformation($"Received command {commandText} from user {userId} in chat {telegramChat.Id}.");
+        await this.SendMessageAsync(
+            data.BotClient,
+            data.Chat,
+            data.User,
+            $"Hello!\nChat '{data.Chat.Title}' is registered. 👌",
+            ParseMode.Html,
+            data.IsPrivate,
+            data.CancellationToken);
+    }
 
-        switch (commandText)
+    private async Task CommandStats(CommandHandlerData data)
+    {
+        var chats = await this.database.GetStatsAsync(
+            data.User.Id,
+            data.Chat.Id,
+            data.IsPrivate,
+            data.CancellationToken);
+        var msg = await this.dataFormatter.FormatStats(
+            chats,
+            data.CancellationToken);
+
+        var answerMessage = await this.SendMessageAsync(
+            data.BotClient,
+            data.Chat,
+            data.User,
+            msg,
+            ParseMode.Html,
+            false,
+            data.CancellationToken);
+
+        if (!data.IsPrivate)
         {
-            case "/came":
-            case "/left":
-            case "/stay":
+            await this.pinnedMessagesManager.NewAsync(
+                data.Chat.Id,
+                answerMessage.MessageId,
+                MessageType.Status,
+                data.CancellationToken);
+
+            await this.scheduledMessageRemover.RemoveAfterAsync(
+                data.Chat.Id,
+                data.Message.MessageId,
+                TimeSpan.FromMinutes(5),
+                data.CancellationToken);
+        }
+    }
+
+    private async Task CommandWebHandlers(CommandHandlerData data)
+    {
+        var hooks = await this.database.GetHooksAsync(
+            data.User.Id,
+            data.CancellationToken);
+
+        if (hooks.Count == 0)
+        {
+            await this.SendMessageAsync(
+                data.BotClient,
+                data.Chat,
+                data.User,
+                "There are no registered chats for this user!",
+                ParseMode.Html,
+                true,
+                data.CancellationToken);
+            return;
+        }
+
+        var keyboardMarkup = await this.dataFormatter.FormatHooksKeyboardMarkup(
+            hooks,
+            data.CancellationToken);
+
+        var sentMessage = await data.BotClient.SendTextMessageAsync(
+            data.User.Id,
+            text: "Unique link for each chat and action are listed below 👇",
+            replyMarkup: keyboardMarkup,
+            cancellationToken: data.CancellationToken);
+    }
+
+    private async Task CommandSetName(CommandHandlerData data)
+    {
+        await this.database.UpdateUserInfoAsync(
+            data.User.Id,
+            oldValues =>
             {
-                var newStatus = commandText switch
+                var firstName = oldValues.firstName;
+                var lastName = oldValues.lastName;
+                var nickName = oldValues.nickName;
+
+                switch (data.CommandName)
                 {
-                    "/came" => Status.CameToWork,
-                    "/left" => Status.LeftWork,
-                    "/stay" => Status.StayAtHome,
-                    _ => Status.Unknown,
-                };
-
-                var chats = await this.database.UpdateUserStatusAsync(
-                    receivedMessage.From!.Id,
-                    telegramChat.Id,
-                    isPrivate,
-                    receivedMessage.From?.Username ?? string.Empty,
-                    receivedMessage.From?.FirstName ?? string.Empty,
-                    receivedMessage.From?.LastName ?? string.Empty,
-                    newStatus,
-                    cancellationToken);
-
-                var answerMessage = await this.SendMessageAsync(
-                    botClient,
-                    receivedMessage,
-                    $"Status updated. 👌",
-                    ParseMode.Html,
-                    false,
-                    isPrivate,
-                    cancellationToken);
-
-                if (isPrivate)
-                {
-                    foreach (var chatId in chats)
+                    case "set_first_name":
                     {
-                        var item = this.pinnedMessagesManager.GetChatEvent(chatId);
-                        item.Set();
+                        firstName = data.CommandArgs;
+                        break;
+                    }
+
+                    case "set_last_name":
+                    {
+                        lastName = data.CommandArgs;
+                        break;
+                    }
+
+                    case "set_user_name":
+                    {
+                        nickName = data.CommandArgs;
+                        break;
+                    }
+
+                    default:
+                    {
+                        break;
                     }
                 }
-                else
-                {
-                    var item = this.pinnedMessagesManager.GetChatEvent(telegramChat.Id);
-                    item.Set();
 
-                    await this.scheduledMessageRemover.RemoveAfterAsync(
-                        telegramChat.Id,
-                        receivedMessage.MessageId,
-                        TimeSpan.FromMinutes(5),
-                        cancellationToken);
+                return (firstName, lastName, nickName);
+            },
+            data.CancellationToken);
 
-                    await this.scheduledMessageRemover.RemoveAfterAsync(
-                        telegramChat.Id,
-                        answerMessage.MessageId,
-                        TimeSpan.FromMinutes(5),
-                        cancellationToken);
-                }
-
-                break;
-            }
-
-            case "/start":
-            {
-                if (isPrivate)
-                {
-                    break;
-                }
-
-                var affectedEntities = await this.database.UpdateUserStatusAsync(
-                    receivedMessage.From!.Id,
-                    telegramChat.Id,
-                    isPrivate,
-                    receivedMessage.From?.Username ?? string.Empty,
-                    receivedMessage.From?.FirstName ?? string.Empty,
-                    receivedMessage.From?.LastName ?? string.Empty,
-                    Status.Unknown,
-                    cancellationToken);
-
-                await this.SendMessageAsync(
-                    botClient,
-                    receivedMessage,
-                    $"Hello!\nChat '{telegramChat.Title}' is registered. 👌",
-                    ParseMode.Html,
-                    false,
-                    isPrivate,
-                    cancellationToken);
-
-                break;
-            }
-
-            case "/end":
-            {
-                break;
-            }
-
-            case "/stats":
-            {
-                var chats = await this.database.GetStatsAsync(
-                    receivedMessage.From!.Id,
-                    telegramChat.Id,
-                    isPrivate,
-                    cancellationToken);
-                var msg = await this.dataFormatter.FormatStats(
-                    chats,
-                    cancellationToken);
-
-                var message = await this.SendMessageAsync(
-                    botClient,
-                    receivedMessage,
-                    msg,
-                    ParseMode.Html,
-                    false,
-                    isPrivate,
-                    cancellationToken);
-
-                if (!isPrivate)
-                {
-                    await this.pinnedMessagesManager.NewAsync(
-                        telegramChat.Id,
-                        message.MessageId,
-                        MessageType.Status,
-                        cancellationToken);
-
-                    await this.scheduledMessageRemover.RemoveAfterAsync(
-                        telegramChat.Id,
-                        receivedMessage.MessageId,
-                        TimeSpan.FromMinutes(5),
-                        cancellationToken);
-                }
-
-                break;
-            }
-
-            case "/web_handlers":
-            {
-                var hooks = await this.database.GetHooksAsync(
-                    receivedMessage.From!.Id,
-                    cancellationToken);
-
-                if (hooks.Count == 0)
-                {
-                    await this.SendMessageAsync(
-                        botClient,
-                        receivedMessage,
-                        "There are no registered chats for this user!",
-                        ParseMode.Html,
-                        false,
-                        true,
-                        cancellationToken);
-                    return;
-                }
-
-                var keyboardMarkup = await this.dataFormatter.FormatHooksKeyboardMarkup(
-                    hooks,
-                    cancellationToken);
-
-                var sentMessage = await botClient.SendTextMessageAsync(
-                    receivedMessage.From?.Id ??
-                    throw new NullReferenceException("Received message from unknown sender!"),
-                    text: "Unique link for each chat and action are listed below 👇",
-                    replyMarkup: keyboardMarkup,
-                    cancellationToken: cancellationToken);
-
-                break;
-            }
-
-            default:
-            {
-                this.logger.LogWarning($"Received an unknown command '{commandText}'!");
-                break;
-            }
-        }
+        var sentMessage = await data.BotClient.SendTextMessageAsync(
+            data.User.Id,
+            text: "Information was updated.",
+            cancellationToken: data.CancellationToken);
     }
 
     private async Task<Message> SendMessageAsync(
         ITelegramBotClient botClient,
-        Message receivedMessage,
+        Telegram.Bot.Types.Chat chat,
+        Telegram.Bot.Types.User user,
         string content,
         ParseMode parseMode,
-        bool asReply,
         bool asPrivate,
         CancellationToken cancellationToken)
     {
         var parts = this.SplitMessage(content);
-        var chatId = receivedMessage.Chat.Id;
         Message? first = null;
 
         foreach (var part in parts)
@@ -287,12 +326,10 @@ public class MessageHandler : IMessageHandler
             var sentMessage =
                 await botClient.SendTextMessageAsync(
                     asPrivate
-                        ? receivedMessage.From?.Id ??
-                          throw new NullReferenceException("Received message from unknown sender!")
-                        : chatId,
+                        ? user.Id
+                        : chat.Id,
                     text: part,
                     parseMode: parseMode,
-                    replyToMessageId: asReply ? receivedMessage.MessageId : default,
                     cancellationToken: cancellationToken);
 
             if (first is null)
@@ -329,5 +366,35 @@ public class MessageHandler : IMessageHandler
         }
 
         return result;
+    }
+
+    private class CommandHandlerData
+    {
+        public CommandHandlerData(
+            Telegram.Bot.ITelegramBotClient botClient,
+            Telegram.Bot.Types.Message message,
+            string commandName,
+            string commandArgs,
+            CancellationToken cancellationToken)
+        {
+            (this.BotClient, this.Message, this.CommandName, this.CommandArgs, this.CancellationToken) =
+                (botClient, message, commandName, commandArgs, cancellationToken);
+        }
+
+        public ITelegramBotClient BotClient { get; }
+
+        public Telegram.Bot.Types.Message Message { get; }
+
+        public string CommandName { get; }
+
+        public string CommandArgs { get; }
+
+        public CancellationToken CancellationToken { get; }
+
+        public Telegram.Bot.Types.Chat Chat => this.Message.Chat;
+
+        public Telegram.Bot.Types.User User => this.Message.From!;
+
+        public bool IsPrivate => this.Chat.Type == ChatType.Private;
     }
 }

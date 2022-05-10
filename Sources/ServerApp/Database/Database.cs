@@ -268,4 +268,36 @@ public class Database : IDatabase
 
         await this.context.SaveChangesAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task UpdateUserInfoAsync(
+        long userId,
+        Func<(string firstName, string lastName, string nickName), (string firstName, string lastName, string
+            nickName)> callback,
+        CancellationToken cancellationToken)
+    {
+        var user = await this.context.Users
+            .FirstOrDefaultAsync(
+                x => x.Id == userId,
+                cancellationToken: cancellationToken);
+
+        if (callback is null)
+        {
+            throw new ArgumentNullException(nameof(callback));
+        }
+
+        if (user is null)
+        {
+            throw new ArgumentException($"Invalid User Id ({userId}), user was not found.", nameof(userId));
+        }
+
+        var oldValues = (user.FirstName, user.LastName, user.NickName);
+        var newValues = callback(oldValues);
+
+        user.FirstName = newValues.firstName;
+        user.LastName = newValues.lastName;
+        user.NickName = newValues.nickName;
+
+        await this.context.SaveChangesAsync(cancellationToken);
+    }
 }
